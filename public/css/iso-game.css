@@ -1,0 +1,34 @@
+
+#chat-input {
+    display: none;
+    position: absolute;
+    top: 560px;
+    left: 0;
+    width: 800px;
+    z-index: 999999;
+}
+
+#chat-input div {
+    position: absolute;
+    bottom: 0px;
+    margin-top: 560px;
+    left:0;
+    max-height: 200px;
+    width:100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    opacity: 0.7;
+    background-color: #000;
+    color: #07ef00;
+}
+
+#chat-input div p {
+    margin: 0 0 0 5px;
+}
+
+#chat-input input {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    opacity: 0.7;
+}

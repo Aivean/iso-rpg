@@ -1,0 +1,14 @@
+<%@ val title:Any = at.getOrElse("title", "Iso Game")%>
+<html>
+    <head>
+        <link rel="icon" type="image/png" sizes="32x32" href="${publicUrl("favicon-32x32.png")}">
+        <link rel="icon" type="image/png" sizes="16x16" href="${publicUrl("favicon-16x16.png")}">
+
+        <title>${title}</title>
+        <%=unescape(at.getOrElse("head", ""))%>
+    </head>
+    <body>
+        <%=unescape(renderedView) %>
+        <%=jsForView%>
+    </body>
+</html>

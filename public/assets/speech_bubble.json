@@ -1,0 +1,111 @@
+{"frames": {
+
+"b":
+{
+	"frame": {"x":35,"y":2,"w":1,"h":2},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":1,"h":2},
+	"sourceSize": {"w":1,"h":2},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"bl":
+{
+	"frame": {"x":20,"y":2,"w":2,"h":2},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":2,"h":2},
+	"sourceSize": {"w":2,"h":2},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"br":
+{
+	"frame": {"x":25,"y":2,"w":2,"h":2},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":2,"h":2},
+	"sourceSize": {"w":2,"h":2},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"c":
+{
+	"frame": {"x":25,"y":11,"w":1,"h":1},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":1,"h":1},
+	"sourceSize": {"w":1,"h":1},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"e":
+{
+	"frame": {"x":29,"y":11,"w":1,"h":1},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":1,"h":1},
+	"sourceSize": {"w":1,"h":1},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"l":
+{
+	"frame": {"x":25,"y":7,"w":2,"h":1},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":2,"h":1},
+	"sourceSize": {"w":2,"h":1},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"r":
+{
+	"frame": {"x":30,"y":7,"w":2,"h":1},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":2,"h":1},
+	"sourceSize": {"w":2,"h":1},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"t":
+{
+	"frame": {"x":35,"y":7,"w":1,"h":2},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":1,"h":2},
+	"sourceSize": {"w":1,"h":2},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"tail":
+{
+	"frame": {"x":2,"y":2,"w":15,"h":10},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":15,"h":10},
+	"sourceSize": {"w":15,"h":10},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"tl":
+{
+	"frame": {"x":30,"y":2,"w":2,"h":2},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":2,"h":2},
+	"sourceSize": {"w":2,"h":2},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"tr":
+{
+	"frame": {"x":20,"y":7,"w":2,"h":2},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":2,"h":2},
+	"sourceSize": {"w":2,"h":2},
+	"pivot": {"x":0.5,"y":0.5}
+}},
+"meta": {
+	"app": "http://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "speech_bubble.png",
+	"format": "RGBA8888",
+	"size": {"w":38,"h":14},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:e0dac186579513b108b5bb2463b37589:eaf6737bae2771d651aaeaa8d9b42834:a7fb5b3ccfad088ce16e8dd1bb0618b1$"
+}
+}
