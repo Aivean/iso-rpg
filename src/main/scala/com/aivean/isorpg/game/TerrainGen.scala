@@ -51,7 +51,8 @@ object TerrainGen {
   }
 
   def randP(predicate: Point => Boolean)(size: Int)(implicit res: Map[Point, TileType]) =
-    Random.shuffle(res.keys.filter(predicate).toList).take(size + Random.nextInt(size))
+    if (size <= 0) Nil
+    else Random.shuffle(res.keys.filter(predicate).toList).take(size + Random.nextInt(size))
 
   def is(pred: TileType => Boolean)(pointPred: Point)(implicit res: Map[Point, TileType]) =
     res.get(pointPred).exists(pred)
@@ -180,8 +181,6 @@ object TerrainGen {
         res += ( p -> HighGrass())
       }
     }
-
-
 
 
 
