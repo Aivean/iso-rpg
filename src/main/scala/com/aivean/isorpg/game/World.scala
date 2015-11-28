@@ -39,16 +39,11 @@ import scala.util.Random
       case ClientConnected(uuid) =>
         val client = sender
         val pos = genFreePoint
-        val newPlayerActor = context.actorOf(Player.props)
+        val newPlayerActor = context.actorOf(Player.props(pos, client))
 
-        client ! Client.PlayerBound(newPlayerActor)
+        players.foreach {_.actor ! Player.PlayerAdded(uuid, pos)}
 
-        players.foreach { player =>
-          player.client ! Client.PlayerAdded(uuid, pos)
-        }
-
-        players :+= new PlayerView(uuid, Movement.Standing(pos), newPlayerActor, client, Set.empty)
-        self ! UpdatePlayersChunks(newPlayerActor)
+        players :+= new PlayerView(uuid, Movement.Standing(pos), newPlayerActor)
 
         players.foreach { p =>
           client ! Client.PlayerAdded(p.uuid, p.state.p)
@@ -56,7 +51,7 @@ import scala.util.Random
 
       case PlayerWantsToMove(targetP) =>
         log.debug(s"want to move to $targetP")
-        players.find(_.player == sender).filter(_.state.isInstanceOf[Movement.Standing])
+        players.find(_.actor == sender).filter(_.state.isInstanceOf[Movement.Standing])
           .foreach { movingPlayer =>
 
             log.debug(s"found player $movingPlayer ${movingPlayer.state}")
@@ -72,24 +67,22 @@ import scala.util.Random
               val ts = System.currentTimeMillis() + stepTime.toMillis
               movingPlayer.state = Movement.MovingTo(nextPoint, ts)
 
-              players.map(_.client)//.filterNot(movingPlayer.client ==)
-                .foreach(_ ! Client.MoveTo(movingPlayer.uuid, ts, nextPoint))
+              players.foreach(_.actor ! Player.PlayerMoved(movingPlayer.uuid, ts, nextPoint))
 
               context.system.scheduler.scheduleOnce(stepTime, self,
-                UpdatePlayersMovement(movingPlayer.player))
+                UpdatePlayersMovement(movingPlayer.actor))
             }
           }
 
       case msg@UpdatePlayersMovement(playerActor) =>
-        players.find(_.player == playerActor).foreach { player =>
-          log.debug("updatign moving state")
+        players.find(_.actor == playerActor).foreach { player =>
+          log.debug("updating moving state")
           val time = System.currentTimeMillis()
           player.state match {
             case Movement.MovingTo(p, ts) if ts <= time =>
               player.state = Movement.Standing(p)
               log.debug(s"arrived at $p")
-              self ! UpdatePlayersChunks(playerActor)
-              player.player ! Player.ArrivedAt(p)
+              player.actor ! Player.ArrivedAt(p)
             case Movement.MovingTo(p, ts) =>
               log.debug(s"moving to $p, not yet arrived")
               context.system.scheduler.scheduleOnce((ts - time) milliseconds, self, msg)
@@ -97,43 +90,20 @@ import scala.util.Random
           }
         }
 
-      case UpdatePlayersChunks(playerActor) =>
-        players.find(_.player == playerActor).foreach { player =>
-          val neededChunks = {
-            // 1/2 tile
-            val (t0, t1) = (math.cos(math.Pi / 6), math.sin(math.Pi / 6))
-            val yShift = -player.state.p.z
-            for (x <- -14 to 14; y <- (-12 + yShift) to 12)
-              yield player.state.p.moved(
-                (x / (2 * t0) + y / (2 * t1)).toInt,
-                (-(x / (2 * t0)) + y / (2 * t1)).toInt
-              ).chunk
+      case ChunksRequest(chIds) =>
+        sender ! PlayerChunksController.TilesAdded(
+          chIds.toList.flatMap(id => chunks.get(id).map(c => (id, c))).toMap)
 
-          }.toSet.filter(chunks.contains)
+      //TODO delegate broadcast functionality to other dedicated actor
 
-          // toAdd
-          for (chId <- neededChunks.diff(player.chunks); tiles = chunks(chId)) {
-            player.client ! Client.TilesAdded(chId,
-              tiles.toList.map { case (p, t) => Client.TileStub(t.tile, t.standable, t.overlay, p) })
-          }
-
-          // toRemove
-          player.chunks.diff(neededChunks).toList match {
-            case Nil =>
-            case x => player.client ! Client.TilesRemoved(x)
-          }
-
-          player.chunks = neededChunks
-        }
-
-      case PlayerTalking(msg) => players.find(_.player == sender).foreach { player =>
-        players.map(_.client).foreach(_ ! Client.PlayerTalking(player.uuid, msg))
+      case PlayerTalking(msg) => players.find(_.actor == sender).foreach { player =>
+        players.foreach(_.actor ! Player.PlayerTalking(player.uuid, msg))
       }
 
       case ClientDisconnected =>
-        players.find(_.player == sender).foreach { p =>
-          players.map(_.client).foreach(_ ! Client.PlayerRemoved(p.uuid))
+        players.find(_.actor == sender).foreach { p =>
           players = players.filterNot(_ == p)
+          players.foreach(_.actor ! Player.PlayerRemoved(p.uuid))
         }
     }
   }
@@ -148,18 +118,16 @@ import scala.util.Random
 
     case class PlayerWantsToMove(p: Point)
 
-    case class UpdatePlayersChunks(player:ActorRef)
-
     case class UpdatePlayersMovement(player:ActorRef)
 
     case class PlayerTalking(msg:String)
 
+    case class ChunksRequest(ids:Set[Long])
+
     class PlayerView(
                       val uuid: String,
                       var state: Movement.Type,
-                      val player: ActorRef,
-                      val client: ActorRef,
-                      var chunks:Set[Long]
+                      val actor: ActorRef
                     )
 
     object Movement {

@@ -65,7 +65,7 @@ class Client extends WebSocketAction  {
         log.info("Player bound! " + uuid)
         this.player = Some(p)
 
-      case MoveTo(id, ts, p) =>
+      case PlayerMoved(id, ts, p) =>
         send(
           ("t" -> "m") ~
             ("id" -> id) ~
@@ -136,7 +136,7 @@ object Client {
 
   case class Received(json: JValue)
 
-  case class MoveTo(uuid: String, ts: Long, p: Point)
+  case class PlayerMoved(uuid: String, ts: Long, p: Point)
 
   case class PlayerTalking(uuid: String, msg:String)
 
