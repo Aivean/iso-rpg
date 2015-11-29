@@ -61,6 +61,8 @@ class Player private (initialPos:Point, client:ActorRef) extends Actor with Acto
 
     case Say(msg) => context.parent ! World.PlayerTalking(msg)
 
+    case ServerMessage(msg) => client ! Client.ServerMessage(msg)
+
     case Disconnected =>
       context.parent ! World.ClientDisconnected
       context.stop(self)
@@ -87,6 +89,8 @@ object Player {
   case class PlayerTalking(uuid: String, msg:String)
 
   case class PlayerRemoved(uuid: String)
+
+  case class ServerMessage(msg:String)
 }
 
 

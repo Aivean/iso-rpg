@@ -1,10 +1,11 @@
 package com.aivean.isorpg.game
 
-import akka.actor.{ActorLogging, Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingReceive
 import com.aivean.isorpg.routes.Client
 import xitrum.Config
 
+import scala.collection.immutable.ListMap
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
@@ -19,7 +20,8 @@ import scala.util.Random
     import World._
     implicit val ec = context.dispatcher
 
-    var world =   TerrainGen.apply(100)
+    val worldSize = 100
+    var world =   TerrainGen.apply(worldSize)
     var chunks = world.groupBy(_._1.chunk)
 
     var players = Seq[PlayerView]()
@@ -48,6 +50,30 @@ import scala.util.Random
         players.foreach { p =>
           client ! Client.PlayerAdded(p.uuid, p.state.p)
         }
+
+      case AdminCommand(cmd, player) =>
+        val NEIGHTBOURS_PATTERN = """tileNeighbors[^\d-]+(-?[\d]+)[^\d-]+(-?[\d]+)[^\d-]+(-?[\d]+)""".r
+        cmd match {
+        case "generateWorld" =>
+          world = TerrainGen.apply(worldSize)
+          chunks = world.groupBy(_._1.chunk)
+          players.foreach(_.actor ! Player.ServerMessage("World Regenerated!"))
+        case "location" =>
+          players.find(_.actor == player) foreach { player =>
+            player.actor ! Player.ServerMessage(player.state.p.toString)
+          }
+        case NEIGHTBOURS_PATTERN(x, y, z) =>
+          try {
+            val p = Point(x.toInt, y.toInt, z.toInt)
+            val result = ListMap("point" -> p, "s" -> p.south, "sw" -> p.south.west, "w" -> p.west, "nw" -> p.north
+              .west, "n" -> p.north, "ne" -> p.north.east, "e" -> p.east, "se" -> p.south.east, "up" -> p.up,
+              "down" -> p.down)
+            .mapValues(world.get(_).map(_.tile).getOrElse("")).map(x => x._1 + ":"+x._2).mkString(", ")
+            player ! Player.ServerMessage(result)
+          } catch {case e: Throwable => player ! Player.ServerMessage("Error: " + e.getMessage)}
+
+        case x => player ! Player.ServerMessage("unknown command: " + x)
+      }
 
       case PlayerWantsToMove(targetP) =>
         log.debug(s"want to move to $targetP")
@@ -115,6 +141,8 @@ import scala.util.Random
     case class ClientConnected(uuid: String)
 
     case object ClientDisconnected
+
+    case class AdminCommand(cmd:String, p:ActorRef)
 
     case class PlayerWantsToMove(p: Point)
 

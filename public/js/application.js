@@ -11,8 +11,6 @@ $(function () {
 		render: render
 	}, false, false);
 
-	var cursorPos;
-	var cursors;
 	var player;
 	var players = {};
 	var isoGroup;
@@ -25,6 +23,10 @@ $(function () {
 	var sortIsScheduled = false;
 
 	var scale = 33;
+
+	function addToConsole(elem) {
+		$(elem).appendTo($("#chat-input div")).get(0).scrollIntoView();
+	}
 
 	function connect() {
 
@@ -185,8 +187,9 @@ $(function () {
 							if (players[data.id]) {
 								var p = players[data.id];
 								var prefix = p == player ? 'You: ' : 'Someone: ';
-								$("<p></p>").text(prefix + data.msg)
-									.appendTo($("#chat-input div")).get(0).scrollIntoView();
+
+								addToConsole(
+									$("<p></p>").text(prefix + data.msg));
 
 								var bubble = new SpeechBubble(game, 0, -10,
 									20, data.msg);
@@ -196,6 +199,11 @@ $(function () {
 									bubble.destroy();
 								}, 5000);
 							}
+							break;
+						// server message
+						case 'sm':
+							addToConsole(
+								$("<p></p>").css({ 'color': 'red'}).text(data.msg));
 							break;
 
 						// pong received
@@ -252,13 +260,13 @@ $(function () {
 		game.stage.disableVisibilityChange = true;
 		//  We're going to be using physics, so enable the Arcade Physics system
 		//game.physics.startSystem(Phaser.Physics.ARCADE);
-		cursors = game.input.keyboard.createCursorKeys();
+		//cursors = game.input.keyboard.createCursorKeys();
 
 		isoGroup = game.add.group();
 		//isoGroup.enableBody = true;
 		//isoGroup.physicsBodyType = Phaser.Plugin.Isometric.ISOARCADE;
 
-		cursorPos = new Phaser.Plugin.Isometric.Point3();
+
 
 		function onClick() {
 			// Update the cursor position.
@@ -283,6 +291,7 @@ $(function () {
 			// Loop through all tiles and test to see if the 3D position
 			// from above intersects with the automatically generated
 			// IsoSprite tile bounds.
+			var cursorPos = new Phaser.Plugin.Isometric.Point3();
 			isoGroup.forEach(function (tile) {
 				// if ground object
 				if (!tile.hasOwnProperty('extra') || !tile.extra.isSelectable) {
@@ -302,14 +311,16 @@ $(function () {
 			if (selectedTile) {
 				setTint(selectedTile, 0x86bfda);
 
-				var pos = selectedTile.extra.origIndex;
-				//console.log("moveTo", pos);
-				socket.send(JSON.stringify({
-					"t": "m",
-					"x": pos.x,
-					"y": pos.y,
-					"z": pos.z + 1
-				}));
+				if (!game.input.keyboard.isDown(Phaser.Keyboard.SHIFT)) {
+					var pos = selectedTile.extra.origIndex;
+					//console.log("moveTo", pos);
+					socket.send(JSON.stringify({
+						"t": "m",
+						"x": pos.x,
+						"y": pos.y,
+						"z": pos.z + 1
+					}));
+				}
 			}
 		}
 
@@ -323,7 +334,35 @@ $(function () {
 				var $input = chatInput.find("input");
 				var text = $input.val().trim();
 				if (text.length != 0) {
-					socket.send(JSON.stringify({"t": "say", "msg": text}));
+					if (/^\//.test(text)) { // system command
+						text = text.substr(1);
+						if (text == 'help') {
+							var $ul = $("<ul></ul>");
+							['generateWorld', 'tileReplace',
+								'tileRemove', 'tileInfo', 'tileExtra', 'location',
+								'tileNeighbors'].forEach(function (c) {
+								$("<li></li>").text(c).appendTo($ul);
+							});
+							addToConsole($ul);
+						} else if (text == 'tileRemove' && selectedTile) {
+							isoGroup.remove(selectedTile, true);
+							selectedTile = null;
+						} else if (text == 'tileInfo' && selectedTile) {
+							console.log(selectedTile);
+						} else if (text == 'tileExtra' && selectedTile) {
+							console.log(selectedTile.extra);
+						} else if (text == 'tileNeighbors' && selectedTile) {
+							var oi = selectedTile.extra.origIndex;
+							socket.send(JSON.stringify({"t": "admin",
+								"cmd": 'tileNeighbors '+ oi.x + ' '+ oi.y + ' ' + oi.z}));
+						} else if (/^tileReplace (.*)/.test(text) && selectedTile) {
+							selectedTile.frameName = (/^tileReplace (.*)/.exec(text)[1]);
+						} else {
+							socket.send(JSON.stringify({"t": "admin", "cmd": text}));
+						}
+					} else {
+						socket.send(JSON.stringify({"t": "say", "msg": text}));
+					}
 				}
 				$input.val("");
 			} else {

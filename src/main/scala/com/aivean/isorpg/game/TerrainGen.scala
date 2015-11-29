@@ -13,20 +13,8 @@ import scala.util.Random
   */
 object TerrainGen {
 
-  //  def tempGen:Map[Point, TileType] =
-  //    Map (
-  //      Point(0,0,0) -> Grass1,
-  //      Point(1,0,0) -> Grass1,
-  //      Point(2,0,0) -> Grass1,
-  //      Point(3,0,0) -> Grass1,
-  //      Point(4,0,0) -> Grass1,
-  //      Point(4,0,1) -> Grass1,
-  //      Point(5,0,0) -> Grass1
-  //      //Point(6,0,0) -> Crab
-  //    )
-
   implicit class RichAnyRef(obj: AnyRef) {
-    def ??[B](implicit m: ClassTag[B]):Boolean = {
+    def ??[B](implicit m: ClassTag[B]): Boolean = {
       obj.getClass.isAssignableFrom(m.runtimeClass)
     }
   }
@@ -62,86 +50,62 @@ object TerrainGen {
     implicit var res = Map[Point, TileType]()
 
     for (x <- 0 to size; y <- 0 to size) {
-      res += (Point(x, y, 0) -> GrassSlope(2,2,2,2))
+      res += (Point(x, y, 0) -> GrassSlope(3, 3, 3, 3))
     }
 
 
-//    /**
-//      * Stones
-//      */
-//    randP(is(_ == Grass))((size * size + Random.nextInt(size * size)) / 150 + 1).flatMap { p =>
-//      spill(p, Random.nextInt(20) + 3, is(_ == Grass))
-//    }.foreach(p => res += (p -> Stone))
-//
-//    /**
-//      * Windows
-//      */
-//    randP(is(_ == Stone))(Random.nextInt(size) * size / 150 + 2).foreach { p =>
-//      res += (p -> Window)
-//    }
-//
-//    /**
-//      * Bushes
-//      */
-//    randP(is(_ == Grass))((size + Random.nextInt(size)) * size / 50 + 1).foreach { p =>
-//      res += (p -> (if (Random.nextBoolean()) Bush1 else Bush2))
-//    }
-//
-//    /**
-//      * Mushrooms
-//      */
-//    randP(is(_ == Grass))(Random.nextInt(size * size) / 150 + 1).foreach { p =>
-//      res += (p -> Mushroom)
-//    }
-//
     /**
       * Lift some grass
       */
-    for(i <- 1 to 3) {
+    for (i <- 1 to 3) {
       randP(is(_.??[GrassSlope]))((size * size + Random.nextInt(size * size)) / 150 + 1).flatMap { p =>
         spill(p, Random.nextInt(400) + 8, p => is(_.??[GrassSlope])(p) && !res.contains(p.up))
-      }.foreach(p => res += (p.up -> GrassSlope(2, 2, 2, 2)))
+      }.foreach(p => res += (p.up -> GrassSlope(3, 3, 3, 3)))
     }
 
-//    /**
-//      * Build high mountain at the center
-//      */
-//    {
-//      val max = size * size / 100
-//      for (i <- 0 until max) {
-//        def isCenter(p: Int) = math.abs(p - (size / 2)) <= (max - i) * size / 4 / max
-//
-//        randP(p => isCenter(p.x) && isCenter(p.y) && is(_.??[GrassSlope])(p))(1).flatMap { p =>
-//          spill(p, Random.nextInt(200) + 8, p => is(_.??[GrassSlope])(p) && !res.contains(p.up))
-//        }.foreach(p => res += (p.up -> GrassSlope(2, 2, 2, 2)))
-//      }
-//    }
+    //    /**
+    //      * Build high mountain at the center
+    //      */
+    //    {
+    //      val max = size * size / 100
+    //      for (i <- 0 until max) {
+    //        def isCenter(p: Int) = math.abs(p - (size / 2)) <= (max - i) * size / 4 / max
+    //
+    //        randP(p => isCenter(p.x) && isCenter(p.y) && is(_.??[GrassSlope])(p))(1).flatMap { p =>
+    //          spill(p, Random.nextInt(200) + 8, p => is(_.??[GrassSlope])(p) && !res.contains(p.up))
+    //        }.foreach(p => res += (p.up -> GrassSlope(3, 3, 3, 3)))
+    //      }
+    //    }
 
     /**
-      * Remove loosely connected highground
+      * Remove lonely highground
       */
-    res.keys.toSet.filter(is(_.??[GrassSlope]))
-      .filter(_.adjFlatAll.count(p => res.get(p).exists(_.??[GrassSlope])) < 4)
-      .foreach {
-      p => res -= p
+    {
+      val q = mutable.Queue[Point]()
+      val isGrass = is(_.??[GrassSlope]) _
+
+      res.keys.filter(isGrass).foreach(q.enqueue(_))
+
+      def lonely(p:Point) = p.z != 0 &&
+        ((p.adjFlatCross :+ p).map(_.down).exists(!isGrass(_)) ||
+        !Seq(p.west, p.north, p.east, p.south, p.west).map(isGrass).sliding(2).contains(Seq(true, true)))
+
+      while (q.nonEmpty) {
+        val p = q.dequeue()
+        if (isGrass(p) && lonely(p)) {
+          res -= p
+          (p.adjFlatAll :+ p.up).filter(isGrass).foreach(q.enqueue(_))
+        }
+      }
     }
 
     /**
       * change grass slopes
       */
-    {
-      val points = res.keys.toSet.filter(is(_.??[GrassSlope]))
-
-      val rating = points.map(p => (p, p.adjFlatCross.count(res.contains))).toMap.mapValues {
-        case 4 => 2
-        case _ => 1
-      }
-
-      points.filter(p => !res.contains(p.up)).foreach {
-        p =>
-          res +=
-            (p -> GrassSlope.find(Seq(p.south, p.west, p.north, p.east).map(rating.getOrElse(_, 0))))
-      }
+    res.foreach {
+      case (p, t: GrassSlope) =>
+        res += (p -> GrassSlope((p.adjFlatAll :+ p.up).map(is(_.??[GrassSlope]))))
+      case _ =>
     }
 
 
@@ -150,16 +114,14 @@ object TerrainGen {
       */
     {
       val quant = Random.nextInt(size * size / 50) / 4 + size / 4 + 1
-      def allowed(p:Point) = p.z ==0 && !res.contains(p.up) && res.get(p).exists(_.??[GrassSlope])
+      def allowed(p: Point) = p.z == 0 && !res.contains(p.up) && res.get(p).exists(_.??[GrassSlope])
 
       val water = randP(allowed)(quant).flatMap { p =>
         spill(p, Random.nextInt(size * size / 6) + 1, allowed)
       }.map(_.up).toSet
 
       water.foreach { p =>
-        val neighbors = Seq(p.south, p.south.west, p.west, p.north.west,
-          p.north, p.north.east, p.east, p.south.east)
-        res += ( p -> Water(neighbors.map(water.contains).map(!_)))
+        res += (p -> Water(p.adjFlatAll.map(water.contains).map(!_)))
       }
     }
 
@@ -169,102 +131,44 @@ object TerrainGen {
       */
     {
       val quant = Random.nextInt(size * size / 200) / 4 + size / 4 + 1
-      def allowed(p:Point) = !res.contains(p.up) && res.get(p).contains(GrassSlope(2,2,2,2))
+      def allowed(p: Point) = !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3))
 
       val grass = randP(allowed)(quant).flatMap { p =>
         spill(p, Random.nextInt(size * size / 300) + 1, allowed)
       }.map(_.up).toSet
 
       grass.foreach { p =>
-//        val neighbors = Seq(p.south, p.south.west, p.west, p.north.west,
-//          p.north, p.north.east, p.east, p.south.east)
-        res += ( p -> HighGrass())
+        //        val neighbors = Seq(p.south, p.south.west, p.west, p.north.west,
+        //          p.north, p.north.east, p.east, p.south.east)
+        res += (p -> HighGrass())
       }
     }
-
-
 
 
     /**
       * Bushes
       */
-    randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(2, 2, 2, 2)))(Random.nextInt(size * size / 20 +
+    randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3)))(Random.nextInt(size * size / 20 +
       20)).foreach(p => res += (p.up -> Bush()))
 
     /**
       * Trees
       */
-    randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(2, 2, 2, 2)))(Random.nextInt(size * size / 30 +
+    randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3)))(Random.nextInt(size * size / 30 +
       10)).foreach(p => res += (p.up -> Tree()))
 
     /**
       * Stones
       */
-    randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(2, 2, 2, 2)))(Random.nextInt(size * size / 100 +
+    randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3)))(Random.nextInt(size * size / 100 +
       10)).foreach(p => res += (p.up -> Stone(Random.nextInt(10) < 8)))
 
     /**
       * Logs
       */
-    randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(2, 2, 2, 2)))(Random.nextInt(size * size / 300 +
+    randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3)))(Random.nextInt(size * size / 300 +
       10)).foreach(p => res += (p.up -> Log()))
 
     res
   }
-
-
-  // def apply(size: Int) = {
-  //    var res = Map[Point, TileType]()
-  //
-  //    for (x <- 0 to size; y <- 0 to size) {
-  //      res += (Point(x, y, 0) -> Grass)
-  //    }
-  //
-  //    /**
-  //      * Water
-  //      */
-  //    {
-  //      val quant = Random.nextInt(size * size / 50) / 4 + size / 4 + 1
-  //      randP(_ => true)(quant).flatMap { p =>
-  //        spill(p, Random.nextInt(size * size / 6) + 1, is(_ == Grass))
-  //      }.foreach(p => res += (p -> Water))
-  //    }
-  //
-  //    /**
-  //      * Stones
-  //      */
-  //    randP(is(_ == Grass))((size * size + Random.nextInt(size * size)) / 150 + 1).flatMap { p =>
-  //      spill(p, Random.nextInt(20) + 3, is(_ == Grass))
-  //    }.foreach(p => res += (p -> Stone))
-  //
-  //    /**
-  //      * Windows
-  //      */
-  //    randP(is(_ == Stone))(Random.nextInt(size) * size / 150 + 2).foreach { p =>
-  //      res += (p -> Window)
-  //    }
-  //
-  //    /**
-  //      * Bushes
-  //      */
-  //    randP(is(_ == Grass))((size + Random.nextInt(size)) * size / 50 + 1).foreach { p =>
-  //      res += (p -> (if (Random.nextBoolean()) Bush1 else Bush2))
-  //    }
-  //
-  //    /**
-  //      * Mushrooms
-  //      */
-  //    randP(is(_ == Grass))(Random.nextInt(size * size) / 150 + 1).foreach { p =>
-  //      res += (p -> Mushroom)
-  //    }
-  //
-  //    /**
-  //      * Lift some grass
-  //      */
-  //    randP(is(_ == Grass))((size * size + Random.nextInt(size * size)) / 150 + 1).flatMap { p =>
-  //      spill(p, Random.nextInt(20) + 3, is(_ == Grass))
-  //    }.foreach(p => res += (p.up -> Grass1))
-  //
-  //    res
-  //  }
 }

@@ -120,60 +120,54 @@ object Tiles {
   }
 
   case class GrassSlope(south: Int, west: Int, north: Int, east: Int) extends TileType {
-    require(north >= 0 && north <= 2, "up must be in range 0..2")
-    require(south >= 0 && south <= 2, "down must be in range 0..2")
-    require(west >= 0 && south <= 2, "left must be in range 0..2")
-    require(east >= 0 && east <= 2, "right must be in range 0..2")
+    require(north >= 0 && north <= 3, "up must be in range 0..3")
+    require(south >= 0 && south <= 3, "down must be in range 0..3")
+    require(west >= 0 && south <= 3, "left must be in range 0..3")
+    require(east >= 0 && east <= 3, "right must be in range 0..3")
 
     def standable = true
     def passable = false
     def tile = "grass-slope-%04d".format(south * 1000 + west * 100 + north * 10 + east)
 
-    override val overlay = if (south != 2 || west != 2 || north != 2 || east != 2) None
+    override val overlay = if (south != 3 || west != 3 || north != 3 || east != 3) None
     else if (Random.nextBoolean()) Some("grass%02d".format(Random.nextInt(18) + 1)) else None
   }
 
   case object GrassSlope {
-    private val slopes = Seq(
-      // s w n e
-      Seq(0, 0, 1, 1),
-      Seq(0, 1, 1, 0),
-      Seq(0, 1, 2, 1),
-      Seq(1, 0, 0, 1),
-      Seq(1, 0, 1, 2),
-      Seq(1, 1, 0, 0),
-      Seq(1, 1, 2, 2),
-      Seq(1, 2, 1, 0),
-      Seq(1, 2, 2, 1),
-      Seq(2, 1, 0, 1),
-      Seq(2, 1, 1, 2),
-      Seq(2, 2, 1, 1),
-      Seq(2, 2, 2, 2))
+    //  S SW W NW N NE E SE T
+    def apply(neighbours: Seq[Boolean]):GrassSlope = neighbours.map(c => if (c) 1 else 0) match {
+//      case Seq(_, _, _, _, _, _, _, _, 1) => GrassSlope(1, 1, 0, 0)
 
-    /**
-      * @param s Seq(S, W, N, E) -> rating in range 0 to 2
-      * @return
-      */
-    def find(s: Seq[Int]) = {
-      def f(ref: Int, act: Int) =
-        if (ref == act) 0
-        else if (act == 1 && ref == 2) 1
-        else if (act == 0 && ref == 2) 2
-        else if (act == 0 && ref == 1) 2
-        else 3
+      case Seq(1, 0, 1, 1, 1, 0, 0, 1, _) => GrassSlope(1, 3, 2, 0)
 
-      (s match {
-        case Seq(0, 0, 0, 0) => Seq(2, 2, 2, 2)
-        case x if slopes.contains(x) => x
-        case _ if s.count(_ == 2) >= 1 && !s.contains(0) => Seq(2, 2, 2, 2)
-        case Seq(ss, ww, nn, ee) =>
-          val s1 = List(ss, ww, nn, ee)
-          slopes.map(s => (s, s.zip(s1).map(x => math.abs(x._1 - x._2)).sum))
-            .sortBy(_._2).head._1
-      }) match {
-        case Seq(ss, ww, nn, ee) => GrassSlope(ss, ww, nn, ee)
-      }
+      case Seq(1, _, _, 0, _, _, 1, 0, _) => GrassSlope(1, 2, 1, 2)
+      case Seq(1, 0, 1, _, _, 0, 1, 1, _) => GrassSlope(2, 1, 2, 1)
+      case Seq(1, 0, 1, 1, 0, _, 1, 1, _) => GrassSlope(2, 1, 2, 1)
+      case Seq(1, 0, 1, 1, 1, 0, 0, 1, _) => GrassSlope(2, 1, 2, 1)
+      case Seq(1, _, 0, 1, 1, 0, 1, 1, _) => GrassSlope(2, 1, 2, 1)
+
+      case Seq(1, _, x, _, y, _, 1, 0, _) if x != y || x == 1 => GrassSlope(1, 3, 3, 2)
+
+      case Seq(1, 0, 1, 1, _, 0, 1, _, _) => GrassSlope(0, 1, 2, 0)
+
+      case Seq(1, _, 1, _, 0, _, 0, _, _) => GrassSlope(1, 2, 0, 0)
+      case Seq(0, _, 1, _, 1, _, 0, _, _) => GrassSlope(0, 1, 2 ,0)
+      case Seq(0, _, 0, _, 1, _, 1, _, _) => GrassSlope(0, 0, 1 ,2)
+      case Seq(1, _, 0, _, 0, _, 1, _, _) => GrassSlope(2, 0, 0, 1)
+
+      case Seq(0, _, 1, _, 1, _, 1, _, _) => GrassSlope(0, 1, 3, 2)
+      case Seq(1, _, 0, _, 1, _, 1, _, _) => GrassSlope(2, 0, 1, 3)
+      case Seq(1, _, 1, _, 0, _, 1, _, _) => GrassSlope(3, 2, 0, 1)
+      case Seq(1, _, 1, _, 1, _, 0, _, _) => GrassSlope(1, 3, 2, 0)
+
+      case Seq(1, 0, 1, _, _, _, 1, _, _) => GrassSlope(2, 1, 3, 3)
+      case Seq(1, _, 1, 0, 1, _, 1, _, _) => GrassSlope(3, 2, 1, 3)
+      case Seq(1, _, _, _, 1, 0, 1, _, _) => GrassSlope(3, 3, 2, 1)
+      case Seq(1, _, 1, _, 1, _, 1, 0, _) => GrassSlope(1, 3, 3, 2)
+
+      case Seq(1, 0, _, 1, 1, _, 1, 1, _) => GrassSlope(2, 1, 2, 1)
+
+      case _ => GrassSlope(3, 3, 3, 3)
     }
   }
-
 }

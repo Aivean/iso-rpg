@@ -21,9 +21,13 @@ case class Point(x: Int, y: Int, z: Int) {
   def moved(x: Int = 0, y: Int = 0, z: Int = 0) =
     copy(this.x + x, this.y + y, this.z + z)
 
+  /**
+    * neighbors in particular order:
+    * S SW W NW N NE E SE
+    */
   def adjFlatAll =
-    for (x <- -1 to 1; y <- -1 to 1 if x != 0 || y != 0)
-      yield copy(x = this.x + x, y = this.y + y)
+    Seq(south, south.west, west, north.west,
+      north, north.east, east, south.east)
 
   def adjFlatCross = Seq(west, east, north, south)
 

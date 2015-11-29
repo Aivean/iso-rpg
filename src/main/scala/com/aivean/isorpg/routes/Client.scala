@@ -52,6 +52,9 @@ class Client extends WebSocketAction  {
                 case JString("say") => (json \ "msg").extractOpt[String].foreach {
                   msg => p ! Player.Say(msg)
                 }
+                case JString("admin") => (json \ "cmd").extractOpt[String].foreach {
+                  cmd => World.world ! World.AdminCommand(cmd, p)
+                }
 
                 case x =>
                   log.warn("unrecognized message: " + x)
@@ -108,10 +111,15 @@ class Client extends WebSocketAction  {
             ("msg" -> msg)
         )
 
+      case ServerMessage(msg) =>
+        send(
+          ("t" -> "sm") ~
+            ("msg" -> msg)
+        )
+
       case WebSocketPing | WebSocketPong =>
     }
   }
-
 
   override def postStop(): Unit = {
     log.debug("postStop")
@@ -121,6 +129,8 @@ class Client extends WebSocketAction  {
 }
 
 object Client {
+
+  case class ServerMessage(msg:String)
 
   case class PlayerAdded(uuid: String, p: Point)
 
