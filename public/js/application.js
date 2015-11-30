@@ -18,7 +18,6 @@ $(function () {
 	var latency = 0;
 	var timeDiff = 0;
 	var selectedTile = null;
-	//var chunks = {};
 	var updateQueue = new Queue();
 	var sortIsScheduled = false;
 
@@ -62,20 +61,20 @@ $(function () {
 									Math.abs(data.y * scale - p.isoY);
 
 								var anim;
-								if (data.x * scale < p.isoX && hor) {
-									anim = 'left';
-								} else if (data.x * scale > p.isoX && hor) {
-									anim = 'right';
-								} else if (data.y * scale > p.isoY && !hor) {
-									anim = 'left'/*'down'*/;
-								} else {
-									anim = /*'up'*/ 'right';
+								if (hor && data.x * scale < p.isoX) {
+									anim = p.extra.movements.west;
+								} else if (hor && data.x * scale > p.isoX) {
+									anim = p.extra.movements.east;
+								} else if (data.y * scale > p.isoY) {
+									anim = p.extra.movements.south;
+								} else /*if (data.y * scale < p.isoY)*/ {
+									anim = p.extra.movements.north;
 								}
 
 								var tween = game.add.tween(p).to({
 										isoX: (data.x * scale),
 										isoY: (data.y * scale),
-										isoZ: (data.z * scale + p.isoBounds.height / 2)
+										isoZ: (data.z * scale + p.isoBounds.height / 2) + 3
 									}, Phaser.Math.max(
 										data.ts + timeDiff - Date.now(), 50),
 									Phaser.Easing.Linear.None,
@@ -83,15 +82,15 @@ $(function () {
 
 								tween.onComplete.add(function () {
 									sortIsScheduled = true;
-									p.movementsStack -= 1;
+									p.extra.movementsStack -= 1;
 									setTimeout(function () {
-										if (p.movementsStack == 0) {
-											p.animations.stop();
+										if (p.extra.movementsStack == 0) {
+											p.extra.movements.stop();
 										}
 									}, Math.max(latency * 2, 50));
 								}, this);
-								p.animations.play(anim);
-								p.movementsStack += 1;
+								anim(); // run the animation
+								p.extra.movementsStack += 1;
 								tween.start();
 							}
 							break;
@@ -101,7 +100,8 @@ $(function () {
 							var newP = createPlayer(data.id,
 								data.x * scale,
 								data.y * scale,
-								data.z * scale
+								data.z * scale,
+								data.sprite
 							);
 							if (data.cur) {
 								player = newP;
@@ -246,6 +246,9 @@ $(function () {
 		game.load.spritesheet('player',
 			assets['maleprotagonistallwalk2.png'], 64, 64);
 
+		game.load.spritesheet('poring',
+			assets['poring.png'], 36, 64);
+
 		game.load.atlasJSONHash('tileset', assets['iso64x64_2.png'],
 			assets['iso64x64_2.json']);
 
@@ -258,23 +261,9 @@ $(function () {
 
 	function create() {
 		game.stage.disableVisibilityChange = true;
-		//  We're going to be using physics, so enable the Arcade Physics system
-		//game.physics.startSystem(Phaser.Physics.ARCADE);
-		//cursors = game.input.keyboard.createCursorKeys();
-
 		isoGroup = game.add.group();
-		//isoGroup.enableBody = true;
-		//isoGroup.physicsBodyType = Phaser.Plugin.Isometric.ISOARCADE;
-
-
 
 		function onClick() {
-			// Update the cursor position.
-			// It's important to understand that screen-to-isometric projection
-			// means you have to specify a z position manually, as this cannot
-			// be easily determined from the 2D pointer position without extra
-			// trickery. By default, the z position is 0 if not set.
-
 			function setTint(tile, tint) {
 				tile.tint = tint;
 				tile.children.forEach(function (c) {
@@ -386,35 +375,44 @@ $(function () {
 	}
 
 
-	function createPlayer(id, x, y, z) {
-		//
-		// The player and its settings
-
-		var player = game.add.isoSprite(x, y, z, 'player');
-		//game.physics.isoArcade.enable(player);
+	function createPlayer(id, x, y, z, sprite) {
+		sprite = sprite || "player";
+		var player = game.add.isoSprite(x, y, z, sprite);
 		isoGroup.add(player);
-		//player.scale.x = 2;
-
 
 		player.anchor.set(0.5);
 		player.isoZ += player.isoBounds.height / 2;
 
-		//player.anchor.set(0.5, 1.25);
-		//player.body.moves = false;
+		player.extra = {movements: {}, movementsStack:0};
+		function scaleAndAnimate(scaleX, anim) {
+			return function () {
+				player.scale.x = scaleX;
+				player.animations.play(anim);
+			};
+		}
 
-		//var player = game.add.sprite(x, y, 'player');
+		if (sprite == 'poring') {
+			player.alpha = 0.8;
+			player.animations.add('south', [0, 1, 2, 3], 5, true);
+			player.animations.add('west', [4,5,6,7], 5, true);
+			player.extra.movements.south = scaleAndAnimate(1, 'south');
+			player.extra.movements.west = scaleAndAnimate(1, 'west');
+			player.extra.movements.north = scaleAndAnimate(-1, 'west');
+			player.extra.movements.east = scaleAndAnimate(-1, 'south');
+		} else  {
+			player.animations.add('left', [6, 7, 8, 9, 10, 11], 8, true);
+			player.animations.add('right', [0, 1, 2, 3, 4, 5], 8, true);
 
-		//  We need to enable physics on the player
-		//game.physics.arcade.enable(player);
-		//player.body.collideWorldBounds = true;
+			player.extra.movements.south =
+				player.extra.movements.west = scaleAndAnimate(1, 'left');
+			player.extra.movements.north =
+				player.extra.movements.east = scaleAndAnimate(1, 'right');
+		}
 
-		//  Our two animations, walking left and right.
-		player.animations.add('left', [6, 7, 8, 9, 10, 11], 8, true);
-		player.animations.add('right', [0, 1, 2, 3, 4, 5], 8, true);
-		//player.animations.add('down', [1, 3, 5, 7, 9, 11], 8, true);
-		//player.animations.add('up', [13, 15, 17, 19, 21, 23], 8, true);
-
-		player.movementsStack = 0;
+		//common for now
+		player.extra.movements.stop = function () {
+			player.animations.stop();
+		};
 
 		players[id] = player;
 

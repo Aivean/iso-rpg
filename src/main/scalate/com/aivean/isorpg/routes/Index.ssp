@@ -14,6 +14,7 @@
             List("iso64x64_2.json",
             "iso64x64_2.png",
             "maleprotagonistallwalk2.png",
+            "poring.png",
             "speech_bubble.json",
             "speech_bubble.png").map(x => (x, publicUrl("assets/" + x))).toMap))};
     </script>

@@ -76,10 +76,11 @@ class Client extends WebSocketAction  {
             ("ts" -> ts) merge decompose(p)
         )
 
-      case PlayerAdded(id, p) =>
+      case PlayerAdded(id, p, sprite) =>
         send(
           ("t" -> "pa") ~
             ("id" -> id) ~
+            ("sprite" -> sprite) ~
             ("cur" -> (id == uuid)) merge decompose(p)
         )
 
@@ -133,7 +134,7 @@ object Client {
 
   case class ServerMessage(msg:String)
 
-  case class PlayerAdded(uuid: String, p: Point)
+  case class PlayerAdded(uuid: String, p: Point, sprite:String)
 
   case class TilesAdded(chunk: Long, tiles: List[TileStub])
 

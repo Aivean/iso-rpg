@@ -31,10 +31,10 @@ import scala.util.Random
     var npcs = Seq[CharView]()
     def allChars = players.view ++ npcs
 
-    for(i <- 1 to 10) {
+    for(i <- 1 to 20) {
       val fp = genFreePoint
       val a = context.actorOf(Monster.props(fp))
-      npcs :+= new CharView(Utils.uuid, Movement.Standing(fp), a)
+      npcs :+= new CharView(Utils.uuid, Movement.Standing(fp), a, "poring")
     }
 
     def freeToMoveTo(p:Point) =
@@ -51,15 +51,18 @@ import scala.util.Random
     def receive = LoggingReceive {
       case ClientConnected(uuid) =>
         val client = sender
-        val pos = genFreePoint
-        val newPlayerActor = context.actorOf(Player.props(pos, client))
+        val char = {
+          val pos = genFreePoint
+          val newPlayerActor = context.actorOf(Player.props(pos, client))
+          new CharView(uuid, Movement.Standing(pos), newPlayerActor, "player")
+        }
 
-        players.foreach {_.actor ! Player.PlayerAdded(uuid, pos)}
+        players.foreach {_.actor ! Player.PlayerAdded(uuid, char.state.p, char.sprite)}
 
-        players :+= new CharView(uuid, Movement.Standing(pos), newPlayerActor)
+        players :+= char
 
         allChars.foreach { p =>
-          client ! Client.PlayerAdded(p.uuid, p.state.p)
+          client ! Client.PlayerAdded(p.uuid, p.state.p, p.sprite)
         }
 
       case AdminCommand(cmd, player) =>
@@ -181,7 +184,8 @@ import scala.util.Random
     class CharView(
                       val uuid: String,
                       var state: Movement.Type,
-                      val actor: ActorRef
+                      val actor: ActorRef,
+                      val sprite: String
                     )
 
     object Movement {
