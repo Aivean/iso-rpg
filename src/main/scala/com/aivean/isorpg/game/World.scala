@@ -2,6 +2,7 @@ package com.aivean.isorpg.game
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingReceive
+import com.aivean.isorpg.game.chars.{MovingObject, PlayerChunksController, Player}
 import com.aivean.isorpg.routes.Client
 import xitrum.Config
 
@@ -24,12 +25,14 @@ import scala.util.Random
     var world =   TerrainGen.apply(worldSize)
     var chunks = world.groupBy(_._1.chunk)
 
-    var players = Seq[PlayerView]()
+    var players = Seq[CharView]()
+    var npcs = Seq[CharView]()
+    def allChars = players.view ++ npcs
 
     def freeToMoveTo(p:Point) =
       world.get(p.down).exists(_.standable) &&
       !world.get(p).exists(!_.passable) &&
-      !players.exists(_.state.p == p)
+      !allChars.exists(_.state.p == p)
 
     def genFreePoint = {
       val p = Random.shuffle(players.map(_.state.p)).headOption.getOrElse(Random.shuffle(world.keys.toSeq).head)
@@ -45,9 +48,9 @@ import scala.util.Random
 
         players.foreach {_.actor ! Player.PlayerAdded(uuid, pos)}
 
-        players :+= new PlayerView(uuid, Movement.Standing(pos), newPlayerActor)
+        players :+= new CharView(uuid, Movement.Standing(pos), newPlayerActor)
 
-        players.foreach { p =>
+        allChars.foreach { p =>
           client ! Client.PlayerAdded(p.uuid, p.state.p)
         }
 
@@ -77,7 +80,7 @@ import scala.util.Random
 
       case PlayerWantsToMove(targetP) =>
         log.debug(s"want to move to $targetP")
-        players.find(_.actor == sender).filter(_.state.isInstanceOf[Movement.Standing])
+        allChars.find(_.actor == sender).filter(_.state.isInstanceOf[Movement.Standing])
           .foreach { movingPlayer =>
 
             log.debug(s"found player $movingPlayer ${movingPlayer.state}")
@@ -101,14 +104,14 @@ import scala.util.Random
           }
 
       case msg@UpdatePlayersMovement(playerActor) =>
-        players.find(_.actor == playerActor).foreach { player =>
+        allChars.find(_.actor == playerActor).foreach { player =>
           log.debug("updating moving state")
           val time = System.currentTimeMillis()
           player.state match {
             case Movement.MovingTo(p, ts) if ts <= time =>
               player.state = Movement.Standing(p)
               log.debug(s"arrived at $p")
-              player.actor ! Player.ArrivedAt(p)
+              player.actor ! MovingObject.ArrivedAt(p)
             case Movement.MovingTo(p, ts) =>
               log.debug(s"moving to $p, not yet arrived")
               context.system.scheduler.scheduleOnce((ts - time) milliseconds, self, msg)
@@ -152,7 +155,7 @@ import scala.util.Random
 
     case class ChunksRequest(ids:Set[Long])
 
-    class PlayerView(
+    class CharView(
                       val uuid: String,
                       var state: Movement.Type,
                       val actor: ActorRef
@@ -166,6 +169,5 @@ import scala.util.Random
       case class Standing(p: Point) extends Type
 
       case class MovingTo(p: Point, arrivalTs: Long) extends Type
-
     }
   }

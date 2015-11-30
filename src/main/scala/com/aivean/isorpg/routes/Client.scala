@@ -1,7 +1,8 @@
 package com.aivean.isorpg.routes
 
 import akka.actor.ActorRef
-import com.aivean.isorpg.game.{World, Player, Point}
+import com.aivean.isorpg.game.chars.Player
+import com.aivean.isorpg.game.{Utils, World, Point}
 import org.json4s
 import org.json4s.Extraction._
 import org.json4s.JsonAST.{JString, JValue}
@@ -26,7 +27,7 @@ class Client extends WebSocketAction  {
 
   var player: Option[ActorRef] = None
 
-  val uuid = java.util.UUID.randomUUID.toString
+  val uuid = Utils.uuid
 
   def send(v:JValue) = {
     respondWebSocketText(JsonMethods.compact(v))

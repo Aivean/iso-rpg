@@ -51,4 +51,6 @@ object Utils {
 
     None
   }
+
+  def uuid = java.util.UUID.randomUUID.toString
 }
