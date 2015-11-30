@@ -2,11 +2,13 @@ package com.aivean.isorpg.game
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingReceive
-import com.aivean.isorpg.game.chars.{MovingObject, PlayerChunksController, Player}
+import com.aivean.isorpg.game.Tiles.TileType
+import com.aivean.isorpg.game.chars.{Monster, MovingObject, PlayerChunksController, Player}
 import com.aivean.isorpg.routes.Client
 import xitrum.Config
 
 import scala.collection.immutable.ListMap
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
@@ -28,6 +30,12 @@ import scala.util.Random
     var players = Seq[CharView]()
     var npcs = Seq[CharView]()
     def allChars = players.view ++ npcs
+
+    for(i <- 1 to 10) {
+      val fp = genFreePoint
+      val a = context.actorOf(Monster.props(fp))
+      npcs :+= new CharView(Utils.uuid, Movement.Standing(fp), a)
+    }
 
     def freeToMoveTo(p:Point) =
       world.get(p.down).exists(_.standable) &&
@@ -123,6 +131,19 @@ import scala.util.Random
         sender ! PlayerChunksController.TilesAdded(
           chIds.toList.flatMap(id => chunks.get(id).map(c => (id, c))).toMap)
 
+      case SurroundingsRequest(point, dist) =>
+        val q = mutable.Queue[Point](point)
+        var res = Map[Point, TileType]()
+        while (q.nonEmpty) {
+          val p = q.dequeue()
+          val toAdd = (p.adjFlatAll :+ p.up :+ p.down)
+            .filterNot(res.contains).filter(_.distTo(point) <= dist)
+            .flatMap(p => world.get(p).map(t => (p, t))).toMap
+          res ++= toAdd
+          toAdd.keys.foreach(q.enqueue(_))
+        }
+        sender ! Monster.SurroundingsView(res)
+
       //TODO delegate broadcast functionality to other dedicated actor
 
       case PlayerTalking(msg) => players.find(_.actor == sender).foreach { player =>
@@ -154,6 +175,8 @@ import scala.util.Random
     case class PlayerTalking(msg:String)
 
     case class ChunksRequest(ids:Set[Long])
+
+    case class SurroundingsRequest(p:Point, dist:Float)
 
     class CharView(
                       val uuid: String,
