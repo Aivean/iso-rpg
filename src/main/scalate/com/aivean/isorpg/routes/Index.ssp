@@ -3,21 +3,25 @@
     <link rel="stylesheet" type="text/css" media="all" href={webJarsUrl("bootstrap/3.3.5/css", "bootstrap.css",
     "bootstrap.min.css")}/>
     <script src={webJarsUrl("jquery/2.1.4", "jquery.js", "jquery-min.js")}></script>
+    <script>
+        var depthSortWorkerUrl = '{publicUrl("js/modules/depth-sort-worker.js")}';
+        var wsUrl = '{webSocketAbsUrl[com.aivean.isorpg.routes.Client]}';
+        var assets = {scala.xml.Unparsed(xitrum.util.SeriDeseri.toJson(
+        List("iso64x64_2.json",
+        "iso64x64_2.png",
+        "maleprotagonistallwalk2.png",
+        "poring.png",
+        "speech_bubble.json",
+        "speech_bubble.png").map(x => (x, publicUrl("assets/" + x))).toMap))};
+    </script>
+    <script src={publicUrl("js/modules/harmony-collections.min.js")}></script>
+    <script src={publicUrl("js/modules/rbush.js")}></script>
+    <script src={publicUrl("js/modules/depth-graph.js")}></script>
     <script src={publicUrl("js/phaser/phaser.js")}></script>
     <script src={publicUrl("js/phaser/phaser-plugin-isometric.js")}></script>
     <script src={publicUrl("js/modules/queue.js")}></script>
     <script src={publicUrl("js/modules/speech-bubble.js")}></script>
     <script src={publicUrl("js/application.js")}></script>
-    <script>
-       var wsUrl = '{webSocketAbsUrl[com.aivean.isorpg.routes.Client]}';
-       var assets = {scala.xml.Unparsed(xitrum.util.SeriDeseri.toJson(
-            List("iso64x64_2.json",
-            "iso64x64_2.png",
-            "maleprotagonistallwalk2.png",
-            "poring.png",
-            "speech_bubble.json",
-            "speech_bubble.png").map(x => (x, publicUrl("assets/" + x))).toMap))};
-    </script>
 %>
 <form id="chat-input">
 <div></div>

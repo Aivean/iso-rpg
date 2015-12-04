@@ -2117,11 +2117,11 @@ Phaser.Plugin.Isometric.Projector.prototype = {
         }
 
         //var temp, j, changes;
-        //for(var i = children.length - 2; i >= 0; i--) {
-        //    temp = children[i];
-        //    j = i;
-        //    while (j < children.length - 1 &&
-        //    ((temp.isActiveObject && compare(children[j + 1], temp) <= 0) ||
+		//for(var i = children.length - 2; i >= 0; i--) {
+		//    temp = children[i];
+		//    j = i;
+		//    while (j < children.length - 1 &&
+		//    ((temp.isActiveObject && compare(children[j + 1], temp) <= 0) ||
         //        (!temp.isActiveObject && compare(children[j + 1], temp) < 0))) {
         //        changes = true;
         //        children[j] = children[j + 1];
@@ -2244,7 +2244,7 @@ Phaser.Plugin.Isometric.Projector.prototype = {
                         b._isoPosition.z + padding < aBounds.top - padding*/)
 
                     {
-                        a.isoSpritesBehind[behindIndex++] = b;
+                            a.isoSpritesBehind[behindIndex++] = b;
                     }
                 }
             }

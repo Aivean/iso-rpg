@@ -19,7 +19,7 @@ $(function () {
 	var timeDiff = 0;
 	var selectedTile = null;
 	var updateQueue = new Queue();
-	var sortIsScheduled = false;
+	var depthGraph = new DepthGraph(game);
 
 	var scale = 33;
 
@@ -74,14 +74,13 @@ $(function () {
 								var tween = game.add.tween(p).to({
 										isoX: (data.x * scale),
 										isoY: (data.y * scale),
-										isoZ: (data.z * scale + p.isoBounds.height / 2) + 3
+										isoZ: (data.z * scale - Math.abs(p.width / 2)) + 1
 									}, Phaser.Math.max(
 										data.ts + timeDiff - Date.now(), 50),
 									Phaser.Easing.Linear.None,
 									false);
 
 								tween.onComplete.add(function () {
-									sortIsScheduled = true;
 									p.extra.movementsStack -= 1;
 									setTimeout(function () {
 										if (p.extra.movementsStack == 0) {
@@ -108,26 +107,25 @@ $(function () {
 								game.camera.focusOn(player);
 								game.camera.follow(player);
 							}
-							sortIsScheduled = true;
 							break;
 
 						// tile added
 						case 'ta':
 							updateQueue.enqueue(function () {
-								var tempGroup = game.add.group();
 								data.tiles.forEach(function (tile) {
 									var t = game.add.isoSprite(tile.x * scale,
 										tile.y * scale, tile.z * scale,
-										'tileset', tile.tile, tempGroup);
+										'tileset', tile.tile, isoGroup);
 									//game.physics.isoArcade.enable(t);
 
 									if (tile.overlay) {
 										t.addChild(game.make.image(0, 0,
-											'tileset', tile.overlay)).anchor.set(0.5, 1);
+											'tileset', tile.overlay))
+											.anchor.set(0.5, 1.5);
 									}
 
-									t.anchor.set(0.5);
-									t.isoZ += t.isoBounds.height / 2;
+									t.anchor.set(0.5, 1);
+									t.isoZ -= Math.abs(t.width / 2);
 
 									t.extra = {};
 									t.extra.origIndex = {
@@ -155,17 +153,13 @@ $(function () {
 									}
 
 								});
-								game.iso.topologicalSort(tempGroup);
-								isoGroup.addMultiple(tempGroup);
-								tempGroup.destroy();
-								sortIsScheduled = true;
 							});
 							break;
 						case 'tr':
 							updateQueue.enqueue(function () {
 								data.c.forEach(function (c) {
 									isoGroup.removePredicate(function (tile) {
-										return tile.hasOwnProperty('extra') &&
+										return tile.extra &&
 											tile.extra.chunkN == c;
 									});
 								});
@@ -191,7 +185,7 @@ $(function () {
 								addToConsole(
 									$("<p></p>").text(prefix + data.msg));
 
-								var bubble = new SpeechBubble(game, 0, -10,
+								var bubble = new SpeechBubble(game, 0, -10 - p.height / 2,
 									20, data.msg);
 								p.addChild(bubble);
 								setTimeout(function() {
@@ -247,7 +241,7 @@ $(function () {
 			assets['maleprotagonistallwalk2.png'], 64, 64);
 
 		game.load.spritesheet('poring',
-			assets['poring.png'], 36, 64);
+			assets['poring.png'], 36, 32);
 
 		game.load.atlasJSONHash('tileset', assets['iso64x64_2.png'],
 			assets['iso64x64_2.json']);
@@ -327,17 +321,24 @@ $(function () {
 						text = text.substr(1);
 						if (text == 'help') {
 							var $ul = $("<ul></ul>");
-							['generateWorld', 'tileReplace',
+							['ping', 'generateWorld', 'tileReplace',
 								'tileRemove', 'tileInfo', 'tileExtra', 'location',
-								'tileNeighbors'].forEach(function (c) {
+								'tileNeighbors', 'selfInfo'].forEach(function (c) {
 								$("<li></li>").text(c).appendTo($ul);
 							});
 							addToConsole($ul);
+						} else if (text == 'ping') {
+							addToConsole(
+								$('<p></p>').text('Latency: ' + latency));
+							addToConsole(
+								$('<p></p>').text('TimeDiff: ' + timeDiff));
 						} else if (text == 'tileRemove' && selectedTile) {
 							isoGroup.remove(selectedTile, true);
 							selectedTile = null;
 						} else if (text == 'tileInfo' && selectedTile) {
 							console.log(selectedTile);
+						} else if (text == 'selfInfo' && player) {
+							console.log(player);
 						} else if (text == 'tileExtra' && selectedTile) {
 							console.log(selectedTile.extra);
 						} else if (text == 'tileNeighbors' && selectedTile) {
@@ -380,8 +381,8 @@ $(function () {
 		var player = game.add.isoSprite(x, y, z, sprite);
 		isoGroup.add(player);
 
-		player.anchor.set(0.5);
-		player.isoZ += player.isoBounds.height / 2;
+		player.anchor.set(0.5, 1);
+		player.isoZ -= Math.abs(player.width / 2);
 
 		player.extra = {movements: {}, movementsStack:0};
 		function scaleAndAnimate(scaleX, anim) {
@@ -460,11 +461,13 @@ $(function () {
 			}
 		});
 
-		sortIsScheduled = true;
-		if (queueWasEmpty && sortIsScheduled) {
-			game.iso.insertionSort(isoGroup);
-			sortIsScheduled = false;
+		if (queueWasEmpty) {
+			depthGraph.topologicalSort(isoGroup.children, function(t){
+				return t.extra && t.extra.isWater;
+			});
+			isoGroup.updateZ();
 		}
+
 		if (!logged) {
 			console.log(isoGroup);
 			logged = true;
@@ -472,10 +475,14 @@ $(function () {
 	}
 
 	function render() {
-		//isoGroup.forEach(function (tile) {
-		//	game.debug.body(tile, 'rgba(189, 221, 235, 0.6)', false);
-		//});
 		//game.debug.text(game.time.fps || '--', 2, 14, "#00ff00");
+		//game.debug.text(depthGraph.elsAvg.get(), 2, 14, "#00ffff");
+
+		//game.debug.text(depthGraph.sorted, 2, 24, "#00ff00");
+
+		//if (game.input.keyboard.isDown(Phaser.Keyboard.SHIFT)) {
+		//	game.debug.text(depthGraph.misplAvg.get(), 2, 34, "#ff0000");
+		//}
 	}
 
 	function registerUpdate() {

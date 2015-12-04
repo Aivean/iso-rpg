@@ -113,7 +113,7 @@ object TerrainGen {
       * Water
       */
     {
-      val quant = Random.nextInt(size * size / 50) / 4 + size / 4 + 1
+      val quant = Random.nextInt(size * size / 50 + 1) / 4 + size / 4 + 1
       def allowed(p: Point) = p.z == 0 && !res.contains(p.up) && res.get(p).exists(_.??[GrassSlope])
 
       val water = randP(allowed)(quant).flatMap { p =>
@@ -130,11 +130,11 @@ object TerrainGen {
       * High grass
       */
     {
-      val quant = Random.nextInt(size * size / 200) / 4 + size / 4 + 1
+      val quant = Random.nextInt(size * size / 200 + 1) / 4 + size / 4 + 1
       def allowed(p: Point) = !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3))
 
       val grass = randP(allowed)(quant).flatMap { p =>
-        spill(p, Random.nextInt(size * size / 300) + 1, allowed)
+        spill(p, Random.nextInt(size * size / 300 + 1) + 1, allowed)
       }.map(_.up).toSet
 
       grass.foreach { p =>
@@ -149,25 +149,25 @@ object TerrainGen {
       * Bushes
       */
     randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3)))(Random.nextInt(size * size / 20 +
-      20)).foreach(p => res += (p.up -> Bush()))
+      size / 15 + 1) + 1).foreach(p => res += (p.up -> Bush()))
 
     /**
       * Trees
       */
     randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3)))(Random.nextInt(size * size / 30 +
-      10)).foreach(p => res += (p.up -> Tree()))
+      size / 20 + 1) + 1).foreach(p => res += (p.up -> Tree()))
 
     /**
       * Stones
       */
     randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3)))(Random.nextInt(size * size / 100 +
-      10)).foreach(p => res += (p.up -> Stone(Random.nextInt(10) < 8)))
+      size / 20 + 1)).foreach(p => res += (p.up -> Stone(Random.nextInt(10) < 8)))
 
     /**
       * Logs
       */
     randP(p => !res.contains(p.up) && res.get(p).contains(GrassSlope(3, 3, 3, 3)))(Random.nextInt(size * size / 300 +
-      10)).foreach(p => res += (p.up -> Log()))
+      size / 20 + 1)).foreach(p => res += (p.up -> Log()))
 
     res
   }

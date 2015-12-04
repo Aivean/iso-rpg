@@ -15199,8 +15199,10 @@ PIXI.DisplayObjectContainer.prototype.removeChildrenArray =
             }
         }
 
+
         if (writeTo < this.children.length) {
-            this.children.splice(writeTo, this.children.length - writeTo);
+            this.children.length = writeTo;
+            //this.children.splice(writeTo, this.children.length - writeTo);
         }
     };
 
