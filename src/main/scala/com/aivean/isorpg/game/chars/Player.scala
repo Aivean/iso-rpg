@@ -18,7 +18,7 @@ class Player private(override val initialPos: Point, client: ActorRef)
 
   import Player._
 
-  val chunksController = context.actorOf(PlayerChunksController.props(context.parent, client))
+  val chunksController = context.actorOf(PlayerChunksController.props(context.parent, client), "chunksContrl")
 
   client ! Client.PlayerBound(self)
   chunksController ! PlayerChunksController.UpdateChunks(pos)

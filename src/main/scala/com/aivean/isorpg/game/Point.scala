@@ -32,9 +32,19 @@ case class Point(x: Int, y: Int, z: Int) {
   def adjFlatCross = Seq(west, east, north, south)
 
   def chunk = ((x >> chunkBits).toLong << (32 - chunkBits)) | (y.toLong >> chunkBits)
+
+  def project = Point2D(
+    (Point.this.x - Point.this.y) * transform._1,
+    (Point.this.x + Point.this.y) * transform._2 - Point.this.z
+  )
 }
 
 object Point {
   val chunkBits = 2
   val chunkSize = 1 << chunkBits
+
+  val projectionAngle = math.atan(0.5)
+  val transform = (math.cos(projectionAngle), math.sin(projectionAngle))
+
+  case class Point2D(x:Double, y:Double)
 }

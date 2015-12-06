@@ -3,8 +3,8 @@ package com.aivean.isorpg.game
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingReceive
 import com.aivean.isorpg.game.Tiles.TileType
-import com.aivean.isorpg.game.chars.{Monster, MovingObject, PlayerChunksController, Player}
-import com.aivean.isorpg.routes.Client
+import com.aivean.isorpg.game.VisibilityController.CharCommons
+import com.aivean.isorpg.game.chars.{Monster, MovingObject, Player, PlayerChunksController}
 import xitrum.Config
 
 import scala.collection.immutable.ListMap
@@ -23,24 +23,31 @@ import scala.util.Random
     import World._
     implicit val ec = context.dispatcher
 
+    val visContr = context.actorOf(VisibilityController.props, "visContrl")
+
     val worldSize = 100
     var world =   TerrainGen.apply(worldSize)
     var chunks = world.groupBy(_._1.chunk)
 
+    var occupied = Set[Point]()
     var players = Seq[CharView]()
     var npcs = Seq[CharView]()
     def allChars = players.view ++ npcs
 
-    for(i <- 1 to 20) {
+    for(i <- 1 to 100) {
       val fp = genFreePoint
-      val a = context.actorOf(Monster.props(fp))
-      npcs :+= new CharView(Utils.uuid, Movement.Standing(fp), a, "poring")
+      occupied += fp
+      val uuid = Utils.uuid
+      val a = context.actorOf(Monster.props(fp), "poring-" + uuid)
+      val view = new CharView(uuid, Movement.Standing(fp), a, "poring")
+      npcs :+= view
+      visContr ! VisibilityController.NPCAdded(CharCommons(view.uuid, view.state.p, view.sprite))
     }
 
     def freeToMoveTo(p:Point) =
       world.get(p.down).exists(_.standable) &&
       !world.get(p).exists(!_.passable) &&
-      !allChars.exists(_.state.p == p)
+      !occupied.contains(p)
 
     def genFreePoint = {
       val p = Random.shuffle(players.map(_.state.p)).headOption.getOrElse(Random.shuffle(world.keys.toSeq).head)
@@ -53,17 +60,14 @@ import scala.util.Random
         val client = sender
         val char = {
           val pos = genFreePoint
-          val newPlayerActor = context.actorOf(Player.props(pos, client))
+          val newPlayerActor = context.actorOf(Player.props(pos, client), "player-" + uuid)
           new CharView(uuid, Movement.Standing(pos), newPlayerActor, "player")
         }
-
-        players.foreach {_.actor ! Player.PlayerAdded(uuid, char.state.p, char.sprite)}
-
+        occupied += char.state.p
         players :+= char
 
-        allChars.foreach { p =>
-          client ! Client.PlayerAdded(p.uuid, p.state.p, p.sprite)
-        }
+        visContr ! VisibilityController.PlayerAdded(CharCommons(char.uuid, char.state.p, char.sprite),
+          char.actor, 25, 21)
 
       case AdminCommand(cmd, player) =>
         val NEIGHTBOURS_PATTERN = """tileNeighbors[^\d-]+(-?[\d]+)[^\d-]+(-?[\d]+)[^\d-]+(-?[\d]+)""".r
@@ -105,9 +109,11 @@ import scala.util.Random
               val stepTime = 400 milliseconds
 
               val ts = System.currentTimeMillis() + stepTime.toMillis
+              occupied -= movingPlayer.state.p
               movingPlayer.state = Movement.MovingTo(nextPoint, ts)
+              occupied += movingPlayer.state.p
 
-              players.foreach(_.actor ! Player.PlayerMoved(movingPlayer.uuid, ts, nextPoint))
+              visContr ! VisibilityController.CharMoving(movingPlayer.uuid, nextPoint, ts)
 
               context.system.scheduler.scheduleOnce(stepTime, self,
                 UpdatePlayersMovement(movingPlayer.actor))
@@ -120,9 +126,12 @@ import scala.util.Random
           val time = System.currentTimeMillis()
           player.state match {
             case Movement.MovingTo(p, ts) if ts <= time =>
+              occupied -= p
               player.state = Movement.Standing(p)
+              occupied += p
               log.debug(s"arrived at $p")
               player.actor ! MovingObject.ArrivedAt(p)
+              visContr ! VisibilityController.CharPositionChanged(player.uuid, p)
             case Movement.MovingTo(p, ts) =>
               log.debug(s"moving to $p, not yet arrived")
               context.system.scheduler.scheduleOnce((ts - time) milliseconds, self, msg)
@@ -156,14 +165,15 @@ import scala.util.Random
       case ClientDisconnected =>
         players.find(_.actor == sender).foreach { p =>
           players = players.filterNot(_ == p)
-          players.foreach(_.actor ! Player.PlayerRemoved(p.uuid))
+          occupied -= p.state.p
+          visContr ! VisibilityController.CharRemoved(p.uuid)
         }
     }
   }
 
   object World {
     //def props = Props(new World)
-    val world = Config.actorSystem.actorOf(Props(new World))
+    val world = Config.actorSystem.actorOf(Props(new World), "world")
 
     case class ClientConnected(uuid: String)
 

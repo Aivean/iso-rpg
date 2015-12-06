@@ -12,6 +12,10 @@ javacOptions ++= Seq("-source", "1.7", "-target", "1.7")
 
 //------------------------------------------------------------------------------
 
+resolvers += "bintray/meetup" at "http://dl.bintray.com/meetup/maven"
+
+//------------------------------------------------------------------------------
+
 libraryDependencies += "tv.cntt" %% "xitrum" % "3.25.0"
 
 // Xitrum uses SLF4J, an implementation of SLF4J is needed
@@ -27,6 +31,9 @@ libraryDependencies += "org.webjars" % "bootstrap" % "3.3.5"
 // Scalate template engine config for Xitrum -----------------------------------
 
 libraryDependencies += "tv.cntt" %% "xitrum-scalate" % "2.5"
+
+// Archery
+libraryDependencies += "com.meetup" %% "archery" % "0.4.0"
 
 // Precompile Scalate templates
 seq(scalateSettings:_*)
