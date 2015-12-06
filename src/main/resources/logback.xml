@@ -12,7 +12,7 @@
     <then>
       <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-          <pattern>[%level] %m%n</pattern>
+          <pattern>[%level] %X{akkaSource} %m%n</pattern>
         </encoder>
       </appender>
 
@@ -29,7 +29,7 @@
       <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>./log/xitrum.log</file>
         <encoder>
-          <pattern>[%level] [%d{yy-MM-dd HH:mm:ss}] %c{1}: %m%n</pattern>
+          <pattern>[%level] [%d{yy-MM-dd HH:mm:ss}] %X{akkaSource} %c{1}: %m%n</pattern>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
           <fileNamePattern>./log/xitrum.log.%d{yy-MM}</fileNamePattern>
