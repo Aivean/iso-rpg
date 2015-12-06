@@ -49,6 +49,8 @@ import scala.util.Random
       !world.get(p).exists(!_.passable) &&
       !occupied.contains(p)
 
+    def zShift(p:Point) = world.get(p.down).map(_.height - 1f).getOrElse(0f)
+
     def genFreePoint = {
       val p = Random.shuffle(players.map(_.state.p)).headOption.getOrElse(Random.shuffle(world.keys.toSeq).head)
 
@@ -113,7 +115,7 @@ import scala.util.Random
               movingPlayer.state = Movement.MovingTo(nextPoint, ts)
               occupied += movingPlayer.state.p
 
-              visContr ! VisibilityController.CharMoving(movingPlayer.uuid, nextPoint, ts)
+              visContr ! VisibilityController.CharMoving(movingPlayer.uuid, ts, nextPoint, zShift(nextPoint))
 
               context.system.scheduler.scheduleOnce(stepTime, self,
                 UpdatePlayersMovement(movingPlayer.actor))

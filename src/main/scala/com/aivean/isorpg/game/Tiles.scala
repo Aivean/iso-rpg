@@ -14,6 +14,7 @@ object Tiles {
     def standable: Boolean
     def passable: Boolean
     def overlay:Option[String] = None
+    def height:Float = 1
   }
 
   case class Water(tile:String = "water-open-0000-01") extends TileType {
@@ -129,8 +130,15 @@ object Tiles {
     def passable = false
     def tile = "grass-slope-%04d".format(south * 1000 + west * 100 + north * 10 + east)
 
-    override val overlay = if (south != 3 || west != 3 || north != 3 || east != 3) None
+    def complete = south == 3 && west == 3 && north == 3 && east == 3
+
+    override val overlay = if (!complete) None
     else if (Random.nextBoolean()) Some("grass%02d".format(Random.nextInt(18) + 1)) else None
+
+    override val height: Float =
+      if ( south ==0 && west ==0 || north == 0 && east == 0) 0.5f
+      else if (west < 3 || east < 3) 0.8f
+      else 1
   }
 
   case object GrassSlope {

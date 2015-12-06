@@ -26,7 +26,7 @@ class Player private(override val initialPos: Point, client: ActorRef)
 
   def receive = LoggingReceive(movingObjectBehavior.orElse[Any, Unit]({
     case PlayerAdded(uuid, p, sprite) => client ! Client.PlayerAdded(uuid, p, sprite)
-    case PlayerMoved(uuid, ts, p) => client ! Client.PlayerMoved(uuid, ts, p)
+    case PlayerMoved(uuid, ts, p, zShift) => client ! Client.PlayerMoved(uuid, ts, p, zShift)
     case PlayerTalking(uuid, msg) => client ! Client.PlayerTalking(uuid, msg)
     case PlayerRemoved(uuid) => client ! Client.PlayerRemoved(uuid)
 
@@ -57,7 +57,7 @@ object Player {
 
   case class PlayerAdded(uuid: String, p: Point, sprite:String)
 
-  case class PlayerMoved(uuid: String, ts: Long, p: Point)
+  case class PlayerMoved(uuid: String, ts: Long, p: Point, zShift:Float)
 
   case class PlayerTalking(uuid: String, msg: String)
 

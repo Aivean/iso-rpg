@@ -71,10 +71,14 @@ $(function () {
 									anim = p.extra.movements.north;
 								}
 
+								var zShift = data.zShift * scale;
+
 								var tween = game.add.tween(p).to({
 										isoX: (data.x * scale),
 										isoY: (data.y * scale),
 										isoZ: (data.z * scale - Math.abs(p.width / 2)) + 1
+												+ zShift
+
 									}, Phaser.Math.max(
 										data.ts + timeDiff - Date.now(), 50),
 									Phaser.Easing.Linear.None,
@@ -462,9 +466,7 @@ $(function () {
 		});
 
 		if (queueWasEmpty) {
-			depthGraph.topologicalSort(isoGroup.children, function(t){
-				return t.extra && t.extra.isWater;
-			});
+			depthGraph.topologicalSort(isoGroup.children, isModificationSuppressed);
 			isoGroup.updateZ();
 		}
 
@@ -472,6 +474,10 @@ $(function () {
 			console.log(isoGroup);
 			logged = true;
 		}
+	}
+
+	function isModificationSuppressed(t) {
+		return t.extra && t.extra.isWater;
 	}
 
 	function render() {

@@ -58,9 +58,9 @@ class VisibilityController private extends Actor with ActorLogging {
       notifyAboutStateUpdate(index.viewersOf(uuid).filter(_.canSee(movingChar)).map(_.uuid).toSet ++ oldViewers)
     }
 
-    case CharMoving(uuid, to, ts) =>
+    case CharMoving(uuid, ts, to, zShift) =>
       index.viewersOf(uuid).filter(v => v.visible.contains(uuid))
-        .foreach(v => v.actor ! Player.PlayerMoved(uuid, ts, to))
+        .foreach(v => v.actor ! Player.PlayerMoved(uuid, ts, to, zShift))
 
     case CharRemoved(uuid) =>
       index.viewersOf(uuid).filter(_.visible.contains(uuid)).foreach { v =>
@@ -169,7 +169,7 @@ object VisibilityController {
   case class PlayerAdded(commons:CharCommons, actor:ActorRef, w:Int, h:Int)
   case class NPCAdded(commons:CharCommons)
   case class UpdatePlayersVisible(uuid: String)
-  case class CharMoving(uuid:String, to:Point, ts:Long)
+  case class CharMoving(uuid: String, ts: Long, to: Point, zShift: Float)
   case class CharPositionChanged(uuid:String, to:Point)
   case class CharRemoved(uuid:String)
 

@@ -113,8 +113,8 @@ function DepthGraph() {
 				idMap.set(data.id, data);
 				updateMsg.updated.push(data.msg());
 			} else {
-				if ((!suppressModification || !suppressModification(a)) &&
-					isModified(data, a)) {
+				if (isModified(data, a) &&
+					(!suppressModification || !suppressModification(a))) {
 					rTree.remove(data.rTreeKey);
 					data.update(a);
 					rTree.insert(data.rTreeKey);

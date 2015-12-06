@@ -69,10 +69,11 @@ class Client extends WebSocketAction  {
         log.info("Player bound! " + uuid)
         this.player = Some(p)
 
-      case PlayerMoved(id, ts, p) =>
+      case PlayerMoved(id, ts, p, zShift) =>
         send(
           ("t" -> "m") ~
             ("id" -> id) ~
+            ("zShift" -> zShift) ~
             ("ts" -> ts) merge decompose(p)
         )
 
@@ -148,7 +149,7 @@ object Client {
 
   case class Received(json: JValue)
 
-  case class PlayerMoved(uuid: String, ts: Long, p: Point)
+  case class PlayerMoved(uuid: String, ts: Long, p: Point, zShift:Float)
 
   case class PlayerTalking(uuid: String, msg:String)
 
