@@ -90,9 +90,10 @@ class Client extends WebSocketAction  {
           ("c" -> chunkId) ~
           ("tiles" ->
             tiles.map {
-              case TileStub(tile, standable, overlay, p) =>
+              case TileStub(tile, standable, overlay, p, height) =>
                 (("tile" -> tile) ~
                   ("standable" -> standable) ~
+                  ("h" -> height) ~
                   ("overlay" -> overlay)) merge decompose(p)
             }))
 
@@ -139,7 +140,7 @@ object Client {
 
   case class TilesAdded(chunk: Long, tiles: List[TileStub])
 
-  case class TileStub(tile:String, standable:Boolean, overlay:Option[String], p:Point)
+  case class TileStub(tile:String, standable:Boolean, overlay:Option[String], p:Point, height:Float)
 
   case class TilesRemoved(chunks: List[Long])
 

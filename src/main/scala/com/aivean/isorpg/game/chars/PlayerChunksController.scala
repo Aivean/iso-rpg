@@ -19,7 +19,7 @@ class PlayerChunksController private(world:ActorRef, client:ActorRef) extends Ac
     case TilesAdded(chunksMap) =>
       for((chId, tiles) <- chunksMap) {
         client ! Client.TilesAdded(chId,
-          tiles.toList.map { case (p, t) => Client.TileStub(t.tile, t.standable, t.overlay, p) })
+          tiles.toList.map { case (p, t) => Client.TileStub(t.tile, t.standable, t.overlay, p, t.height) })
       }
 
     case UpdateChunks(pos)  =>

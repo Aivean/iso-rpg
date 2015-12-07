@@ -77,17 +77,18 @@ function DepthGraph() {
 	Data.prototype.msg = function () {
 		var a = this.rTreeKey[4];
 		var bnds = a.body || a.isoBounds;
+		var zShift = ((a.extra.height | 1) - 1) * bnds.height;
 
 		return {
 			id: this.id,
 			rTreeKey: this.rTreeKey.slice(0, 4),
-			depth: depth(bnds),
+			depth: depth(bnds) + zShift,
 			bounds: {
 				frontX: bnds.frontX,
 				backX: bnds.backX,
 				frontY: bnds.frontY,
 				backY: bnds.backY,
-				top: bnds.top,
+				top: bnds.top + zShift,
 				bottom: bnds.bottom
 			}
 		};

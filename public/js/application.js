@@ -27,6 +27,34 @@ $(function () {
 		$(elem).appendTo($("#chat-input div")).get(0).scrollIntoView();
 	}
 
+
+	function TileExtra(tile, chunkN, isoZ) {
+		this.origIndex = {
+			x: tile.x,
+			y: tile.y,
+			z: tile.z
+		};
+		this.standable = tile.standable || false;
+		this.chunkN = chunkN;
+
+		this.origZ = isoZ;
+		this.height = tile.height;
+
+		this.isWater =
+			(tile.tile.indexOf('water') != -1);
+
+		this.isMovingWater =
+			(tile.tile ==
+			'water-open-0000-01' ||
+			tile.tile == 'water-open-0000-01');
+
+		this.isSelectable = !this.isWater;
+		if (tile.tile.indexOf('higrass') != -1) {
+			this.isTransparent = true;
+			this.isSelectable = false;
+		}
+	}
+
 	function connect() {
 
 		try {
@@ -131,31 +159,7 @@ $(function () {
 									t.anchor.set(0.5, 1);
 									t.isoZ -= Math.abs(t.width / 2);
 
-									t.extra = {};
-									t.extra.origIndex = {
-										x: tile.x,
-										y: tile.y,
-										z: tile.z
-									};
-									t.extra.standable = tile.standable || false;
-									t.extra.chunkN = data.c;
-
-									t.extra.origZ = t.isoZ;
-
-									t.extra.isWater =
-										(tile.tile.indexOf('water') != -1);
-
-									t.extra.isMovingWater =
-										(tile.tile ==
-										'water-open-0000-01' ||
-										tile.tile == 'water-open-0000-01');
-
-									t.extra.isSelectable = !t.extra.isWater;
-									if (tile.tile.indexOf('higrass') != -1) {
-										t.extra.isTransparent = true;
-										t.extra.isSelectable = false;
-									}
-
+									t.extra = new TileExtra(tile, data.c, t.isoZ);
 								});
 							});
 							break;
@@ -418,6 +422,8 @@ $(function () {
 		player.extra.movements.stop = function () {
 			player.animations.stop();
 		};
+
+		player.extra.height = 3;
 
 		players[id] = player;
 
