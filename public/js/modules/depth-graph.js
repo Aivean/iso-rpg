@@ -26,7 +26,8 @@ function DepthGraph() {
 	};
 
 	this.intersects = function (a) {
-		return rTree.search(rTreeKey(a)).map(function (el) {
+		return (Array.isArray(a) ? rTree.search(a) : rTree.search(rTreeKey(a)))
+		.map(function (el) {
 			return el[4];
 		});
 	};
@@ -77,7 +78,7 @@ function DepthGraph() {
 	Data.prototype.msg = function () {
 		var a = this.rTreeKey[4];
 		var bnds = a.body || a.isoBounds;
-		var zShift = ((a.extra.height | 1) - 1) * bnds.height;
+		var zShift = (((a.extra ? a.extra.height : 1) | 1) - 1) * bnds.height;
 
 		return {
 			id: this.id,

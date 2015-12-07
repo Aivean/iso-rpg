@@ -277,33 +277,34 @@ $(function () {
 				setTint(selectedTile, 0xffffff);
 			}
 
+			var pos = game.input.activePointer.position;
+			var cursorPos = game.iso.unproject(pos);
+			cursorPos = game.iso.projectXY(cursorPos);
+			var x = cursorPos.x;
+			var y = cursorPos.y;
+
 			selectedTile = null;
 
-			// Loop through all tiles and test to see if the 3D position
-			// from above intersects with the automatically generated
-			// IsoSprite tile bounds.
-			var cursorPos = new Phaser.Plugin.Isometric.Point3();
-			isoGroup.forEach(function (tile) {
-				// if ground object
-				if (!tile.hasOwnProperty('extra') || !tile.extra.isSelectable) {
-					return;
-				}
-				game.iso.unproject(game.input.activePointer.position, cursorPos,
-					tile.extra.standable ? tile.isoBounds.top : tile.isoBounds.bottom);
-				var inBounds = tile.isoBounds.containsXY(cursorPos.x,
-					cursorPos.y);
-				// If it does, do a little animation and tint change.
-				if (inBounds) {
-					selectedTile = tile;
+			depthGraph.intersects([x,y,x,y]).forEach(function (t) {
+				if (t.extra && t.extra.isSelectable) {
+					t.inputEnabled = true;
+					t.input.pixelPerfectAlpha = 0.2;
+					t.input.pixelPerfectOver = true;
+					if (t.input.checkPointerOver(game.input.activePointer,
+							false)) {
+						if (!selectedTile || selectedTile.z < t.z) {
+							selectedTile = t;
+						}
+					}
+					t.inputEnabled = false;
 				}
 			});
 
-			//console.log("click", selectedTile);
 			if (selectedTile) {
 				setTint(selectedTile, 0x86bfda);
 
 				if (!game.input.keyboard.isDown(Phaser.Keyboard.SHIFT)) {
-					var pos = selectedTile.extra.origIndex;
+					pos = selectedTile.extra.origIndex;
 					//console.log("moveTo", pos);
 					socket.send(JSON.stringify({
 						"t": "m",
