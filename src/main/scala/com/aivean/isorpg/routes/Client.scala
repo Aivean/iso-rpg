@@ -41,7 +41,7 @@ class Client extends WebSocketAction  {
     context.become {
 
       case WebSocketText(text) =>
-        log.info("onTextMessage: " + text)
+        if (!text.contains("\"t\":\"ping\"")) log.info("onTextMessage: " + text)
 
         Try(JsonMethods.parse(text)) match {
           case Success(json) =>
@@ -50,6 +50,7 @@ class Client extends WebSocketAction  {
             } else player.foreach { p =>
               json \ "t" match {
                 case JString("m") => p ! Player.RequestMoveTo(json.extract[Point])
+                case JString("a") => p ! Player.RequestAttack((json \ "id").extract[String])
                 case JString("say") => (json \ "msg").extractOpt[String].foreach {
                   msg => p ! Player.Say(msg)
                 }

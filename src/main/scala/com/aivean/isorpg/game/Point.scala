@@ -31,6 +31,8 @@ case class Point(x: Int, y: Int, z: Int) {
 
   def adjFlatCross = Seq(west, east, north, south)
 
+  def closeProximity = adjFlatCross ++ adjFlatCross.map(_.up) ++ adjFlatCross.map(_.down)
+
   def chunk = ((x >> chunkBits).toLong << (32 - chunkBits)) | (y.toLong >> chunkBits)
 
   def project = Point2D(

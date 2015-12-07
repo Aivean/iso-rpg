@@ -1,7 +1,6 @@
 package com.aivean.isorpg.game.chars
 
 import akka.actor._
-import akka.event.LoggingReceive
 import com.aivean.isorpg.game.{Point, World}
 import com.aivean.isorpg.routes.Client
 
@@ -14,7 +13,7 @@ import scala.language.postfixOps
   */
 
 class Player private(override val initialPos: Point, client: ActorRef)
-  extends Actor with ActorLogging with MovingObject {
+  extends Actor with ActorLogging with StatePolling {
 
   import Player._
 
@@ -24,13 +23,15 @@ class Player private(override val initialPos: Point, client: ActorRef)
   chunksController ! PlayerChunksController.UpdateChunks(pos)
 
 
-  def receive = LoggingReceive(movingObjectBehavior.orElse[Any, Unit]({
+  def receive = movingObjectBehavior.orElse[Any, Unit]({
     case PlayerAdded(uuid, p, sprite) => client ! Client.PlayerAdded(uuid, p, sprite)
     case PlayerMoved(uuid, ts, p, zShift) => client ! Client.PlayerMoved(uuid, ts, p, zShift)
     case PlayerTalking(uuid, msg) => client ! Client.PlayerTalking(uuid, msg)
     case PlayerRemoved(uuid) => client ! Client.PlayerRemoved(uuid)
 
-    case RequestMoveTo(p) => setMovementTarget(p)
+    case RequestMoveTo(p) => setTarget(MovingToState(p))
+
+    case RequestAttack(uuid) => setTarget(AttackState(uuid))
 
     case Say(msg) => context.parent ! World.PlayerTalking(msg)
 
@@ -39,7 +40,7 @@ class Player private(override val initialPos: Point, client: ActorRef)
     case Disconnected =>
       context.parent ! World.ClientDisconnected
       context.stop(self)
-  }))
+  })
 
   override def onArrivedAt(): Unit = {
     chunksController ! PlayerChunksController.UpdateChunks(pos)
@@ -50,6 +51,8 @@ object Player {
   def props(p: Point, client: ActorRef) = Props(new Player(p, client))
 
   case class RequestMoveTo(p: Point)
+
+  case class RequestAttack(uuid: String)
 
   case class Say(msg: String)
 

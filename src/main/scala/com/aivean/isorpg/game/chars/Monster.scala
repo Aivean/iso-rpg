@@ -13,7 +13,7 @@ import scala.util.Random
   * @author <a href="mailto:ivan.zaytsev@webamg.com">Ivan Zaytsev</a>
   *         2015-11-29
   */
-class Monster private (override val initialPos:Point) extends Actor with ActorLogging with MovingObject {
+class Monster private (override val initialPos:Point) extends Actor with ActorLogging with StatePolling {
   import Monster._
 
   var lastArrivedAt = System.currentTimeMillis()
@@ -35,7 +35,7 @@ class Monster private (override val initialPos:Point) extends Actor with ActorLo
       Random.shuffle(tiles.toList.collect {
         case (p, t) if t.standable && !tiles.get(p.up).exists(!_.passable) => p.up
       }).headOption.foreach {
-        p => setMovementTarget(p)
+        p => setTarget(MovingToState(p))
       }
   })
 

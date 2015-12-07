@@ -285,6 +285,24 @@ $(function () {
 
 			selectedTile = null;
 
+			for (pk in players) {
+				if (players.hasOwnProperty(pk)) {
+					t = players[pk];
+					if (t != player &&
+						(!selectedTile || selectedTile.z < t.z)) {
+						t.inputEnabled = true;
+						t.input.pixelPerfectAlpha = 0.2;
+						t.input.pixelPerfectOver = true;
+						if (t.input.checkPointerOver(game.input.activePointer,
+								false)) {
+
+							selectedTile = t;
+						}
+						t.inputEnabled = false;
+					}
+				}
+			}
+
 			depthGraph.intersects([x,y,x,y]).forEach(function (t) {
 				if (t.extra && t.extra.isSelectable) {
 					t.inputEnabled = true;
@@ -304,14 +322,21 @@ $(function () {
 				setTint(selectedTile, 0x86bfda);
 
 				if (!game.input.keyboard.isDown(Phaser.Keyboard.SHIFT)) {
-					pos = selectedTile.extra.origIndex;
-					//console.log("moveTo", pos);
-					socket.send(JSON.stringify({
-						"t": "m",
-						"x": pos.x,
-						"y": pos.y,
-						"z": pos.z + 1
-					}));
+					if (selectedTile.extra && selectedTile.extra.id) {
+						socket.send(JSON.stringify({
+							"t": "a",
+							"id" : selectedTile.extra.id
+						}));
+					} else {
+						pos = selectedTile.extra.origIndex;
+						//console.log("moveTo", pos);
+						socket.send(JSON.stringify({
+							"t": "m",
+							"x": pos.x,
+							"y": pos.y,
+							"z": pos.z + 1
+						}));
+					}
 				}
 			}
 		}
@@ -393,7 +418,7 @@ $(function () {
 		player.anchor.set(0.5, 1);
 		player.isoZ -= Math.abs(player.width / 2);
 
-		player.extra = {movements: {}, movementsStack:0};
+		player.extra = {id: id, movements: {}, movementsStack:0};
 		function scaleAndAnimate(scaleX, anim) {
 			return function () {
 				player.scale.x = scaleX;

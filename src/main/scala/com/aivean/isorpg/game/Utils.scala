@@ -9,8 +9,8 @@ import scala.collection.mutable
   */
 object Utils {
 
-  def path(start: Point, target: Point,
-           canMove: (Point, Point) => Boolean): Option[List[Point]] = {
+  def path(start: Point, target: Set[Point],
+           canMove: (Point, Point) => Boolean): Option[List[Point]] = if (target.isEmpty) None else {
 
     val q = new mutable.Queue[Point]()
     val map = mutable.Map[Point, Point]()
@@ -23,7 +23,7 @@ object Utils {
     while (q.nonEmpty && moves < 500) {
       moves += 1
       val p = q.dequeue()
-      if (p == target) {
+      if (target.contains(p)) {
         var res = List(p)
         var c = p
         while (c != start) {
@@ -40,7 +40,7 @@ object Utils {
         )).map { case Point(x, y, z) => Point(x + p.x, y + p.y, z + p.z) }
           .filterNot(map.contains)
           .filter(p1 => canMove(p, p1))
-          .sortBy(_.distTo(target))
+          .sortBy(p => target.map(_.distTo(p)).min)
           .foreach {
             p1 =>
               map += (p1 -> p)

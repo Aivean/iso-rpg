@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingReceive
 import com.aivean.isorpg.game.Tiles.TileType
 import com.aivean.isorpg.game.VisibilityController.CharCommons
-import com.aivean.isorpg.game.chars.{Monster, MovingObject, Player, PlayerChunksController}
+import com.aivean.isorpg.game.chars._
 import xitrum.Config
 
 import scala.collection.immutable.ListMap
@@ -25,7 +25,7 @@ import scala.util.Random
 
     val visContr = context.actorOf(VisibilityController.props, "visContrl")
 
-    val worldSize = 100
+    val worldSize = 20
     var world =   TerrainGen.apply(worldSize)
     var chunks = world.groupBy(_._1.chunk)
 
@@ -34,15 +34,15 @@ import scala.util.Random
     var npcs = Seq[CharView]()
     def allChars = players.view ++ npcs
 
-    for(i <- 1 to 100) {
-      val fp = genFreePoint
-      occupied += fp
-      val uuid = Utils.uuid
-      val a = context.actorOf(Monster.props(fp), "poring-" + uuid)
-      val view = new CharView(uuid, Movement.Standing(fp), a, "poring")
-      npcs :+= view
-      visContr ! VisibilityController.NPCAdded(CharCommons(view.uuid, view.state.p, view.sprite))
-    }
+    for(i <- 1 to 1) {
+        val fp = genFreePoint
+        occupied += fp
+        val uuid = Utils.uuid
+        val a = context.actorOf(Monster.props(fp), "poring-" + uuid)
+        val view = new CharView(uuid, Movement.Standing(fp), a, "poring")
+        npcs :+= view
+        visContr ! VisibilityController.NPCAdded(CharCommons(view.uuid, view.state.p, view.sprite))
+      }
 
     def freeToMoveTo(p:Point) =
       world.get(p.down).exists(_.standable) &&
@@ -102,7 +102,17 @@ import scala.util.Random
 
             log.debug(s"found player $movingPlayer ${movingPlayer.state}")
 
-            val path = Utils.path(movingPlayer.state.p, targetP, { (p,p1)=> freeToMoveTo(p1)})
+            val path = {
+              val startP = movingPlayer.state.p
+              def calcPath(pts:Set[Point]) = Utils.path(startP, pts, { (p, p1) => freeToMoveTo(p1) })
+              calcPath(Set(targetP)).orElse(targetP.closeProximity.toSet match {
+                case x if !x.contains(startP) => x.filter(freeToMoveTo) match {
+                  case Seq() => None
+                  case x => calcPath(x)
+                }
+                case _ => None
+              })
+            }
 
             log.debug(s"found path $path")
 
@@ -122,17 +132,30 @@ import scala.util.Random
             }
           }
 
+      case PlayerWantsToAttack(uuid) => allChars.find(_.actor == sender)
+        .filter(_.state.isInstanceOf[Movement.Standing]).foreach { player =>
+        allChars.find(_.uuid == uuid) match {
+          case Some(target) if target.state.p.closeProximity.contains(player.state.p) =>
+            sender ! Player.ServerMessage("Attack!")
+
+          case Some(target) =>
+            self forward PlayerWantsToMove(target.state.p)
+
+          case None => sender ! StatePolling.AttackTargetDoesNotExist(uuid)
+        }
+      }
+
       case msg@UpdatePlayersMovement(playerActor) =>
         allChars.find(_.actor == playerActor).foreach { player =>
           log.debug("updating moving state")
           val time = System.currentTimeMillis()
           player.state match {
             case Movement.MovingTo(p, ts) if ts <= time =>
-              occupied -= p
+              occupied -= player.state.p
               player.state = Movement.Standing(p)
               occupied += p
               log.debug(s"arrived at $p")
-              player.actor ! MovingObject.ArrivedAt(p)
+              player.actor ! StatePolling.ArrivedAt(p)
               visContr ! VisibilityController.CharPositionChanged(player.uuid, p)
             case Movement.MovingTo(p, ts) =>
               log.debug(s"moving to $p, not yet arrived")
@@ -184,6 +207,8 @@ import scala.util.Random
     case class AdminCommand(cmd:String, p:ActorRef)
 
     case class PlayerWantsToMove(p: Point)
+
+    case class PlayerWantsToAttack(uuid:String)
 
     case class UpdatePlayersMovement(player:ActorRef)
 
