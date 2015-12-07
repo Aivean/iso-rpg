@@ -26,6 +26,7 @@ class Player private(override val initialPos: Point, client: ActorRef)
   def receive = movingObjectBehavior.orElse[Any, Unit]({
     case PlayerAdded(uuid, p, sprite) => client ! Client.PlayerAdded(uuid, p, sprite)
     case PlayerMoved(uuid, ts, p, zShift) => client ! Client.PlayerMoved(uuid, ts, p, zShift)
+    case PlayerAttacked(uuid, targetUuid, ts) => client ! Client. PlayerAttacked(uuid, targetUuid, ts)
     case PlayerTalking(uuid, msg) => client ! Client.PlayerTalking(uuid, msg)
     case PlayerRemoved(uuid) => client ! Client.PlayerRemoved(uuid)
 
@@ -61,6 +62,8 @@ object Player {
   case class PlayerAdded(uuid: String, p: Point, sprite:String)
 
   case class PlayerMoved(uuid: String, ts: Long, p: Point, zShift:Float)
+
+  case class PlayerAttacked(uuid: String, targetUuid:String, ts: Long)
 
   case class PlayerTalking(uuid: String, msg: String)
 

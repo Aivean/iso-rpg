@@ -25,7 +25,7 @@ import scala.util.Random
 
     val visContr = context.actorOf(VisibilityController.props, "visContrl")
 
-    val worldSize = 20
+    val worldSize = 100
     var world =   TerrainGen.apply(worldSize)
     var chunks = world.groupBy(_._1.chunk)
 
@@ -34,12 +34,12 @@ import scala.util.Random
     var npcs = Seq[CharView]()
     def allChars = players.view ++ npcs
 
-    for(i <- 1 to 1) {
+    for(i <- 1 to 100) {
         val fp = genFreePoint
         occupied += fp
         val uuid = Utils.uuid
         val a = context.actorOf(Monster.props(fp), "poring-" + uuid)
-        val view = new CharView(uuid, Movement.Standing(fp), a, "poring")
+        val view = new CharView(uuid, CharState.Standing(fp), a, "poring")
         npcs :+= view
         visContr ! VisibilityController.NPCAdded(CharCommons(view.uuid, view.state.p, view.sprite))
       }
@@ -63,7 +63,7 @@ import scala.util.Random
         val char = {
           val pos = genFreePoint
           val newPlayerActor = context.actorOf(Player.props(pos, client), "player-" + uuid)
-          new CharView(uuid, Movement.Standing(pos), newPlayerActor, "player")
+          new CharView(uuid, CharState.Standing(pos), newPlayerActor, "player")
         }
         occupied += char.state.p
         players :+= char
@@ -97,7 +97,7 @@ import scala.util.Random
 
       case PlayerWantsToMove(targetP) =>
         log.debug(s"want to move to $targetP")
-        allChars.find(_.actor == sender).filter(_.state.isInstanceOf[Movement.Standing])
+        allChars.find(_.actor == sender).filter(_.state.isInstanceOf[CharState.Standing])
           .foreach { movingPlayer =>
 
             log.debug(s"found player $movingPlayer ${movingPlayer.state}")
@@ -122,21 +122,27 @@ import scala.util.Random
 
               val ts = System.currentTimeMillis() + stepTime.toMillis
               occupied -= movingPlayer.state.p
-              movingPlayer.state = Movement.MovingTo(nextPoint, ts)
+              movingPlayer.state = CharState.MovingTo(nextPoint, ts)
               occupied += movingPlayer.state.p
 
               visContr ! VisibilityController.CharMoving(movingPlayer.uuid, ts, nextPoint, zShift(nextPoint))
 
               context.system.scheduler.scheduleOnce(stepTime, self,
-                UpdatePlayersMovement(movingPlayer.actor))
+                UpdateCharState(movingPlayer.actor))
             }
           }
 
       case PlayerWantsToAttack(uuid) => allChars.find(_.actor == sender)
-        .filter(_.state.isInstanceOf[Movement.Standing]).foreach { player =>
+        .filter(_.state.isInstanceOf[CharState.Standing]).foreach { player =>
         allChars.find(_.uuid == uuid) match {
           case Some(target) if target.state.p.closeProximity.contains(player.state.p) =>
             sender ! Player.ServerMessage("Attack!")
+            val attackTime = 300 milliseconds
+            val time = System.currentTimeMillis()
+            player.state = CharState.Attacking(target.uuid, player.state.p,  time + attackTime.toMillis)
+            visContr ! VisibilityController.CharAttacking(player.uuid, target.uuid, attackTime.toMillis)
+            context.system.scheduler.scheduleOnce(attackTime, self,
+              UpdateCharState(player.actor))
 
           case Some(target) =>
             self forward PlayerWantsToMove(target.state.p)
@@ -145,21 +151,29 @@ import scala.util.Random
         }
       }
 
-      case msg@UpdatePlayersMovement(playerActor) =>
+      case msg@UpdateCharState(playerActor) =>
         allChars.find(_.actor == playerActor).foreach { player =>
           log.debug("updating moving state")
           val time = System.currentTimeMillis()
           player.state match {
-            case Movement.MovingTo(p, ts) if ts <= time =>
+            case CharState.Standing(_) =>
+
+            case x:CharState.Timed if x.endTs > time =>
+              log.debug(s"action $x is not yet completed, rescheduling")
+              context.system.scheduler.scheduleOnce((x.endTs - time) milliseconds, self, msg)
+
+            case CharState.MovingTo(p, ts) =>
               occupied -= player.state.p
-              player.state = Movement.Standing(p)
+              player.state = CharState.Standing(p)
               occupied += p
               log.debug(s"arrived at $p")
               player.actor ! StatePolling.ArrivedAt(p)
               visContr ! VisibilityController.CharPositionChanged(player.uuid, p)
-            case Movement.MovingTo(p, ts) =>
-              log.debug(s"moving to $p, not yet arrived")
-              context.system.scheduler.scheduleOnce((ts - time) milliseconds, self, msg)
+
+            case CharState.Attacking(uuid, p, ts)  =>
+              player.state = CharState.Standing(p)
+              log.debug(s"hit!")
+
             case _ =>
           }
         }
@@ -200,6 +214,8 @@ import scala.util.Random
     //def props = Props(new World)
     val world = Config.actorSystem.actorOf(Props(new World), "world")
 
+    private case class UpdateCharState(player:ActorRef)
+
     case class ClientConnected(uuid: String)
 
     case object ClientDisconnected
@@ -210,8 +226,6 @@ import scala.util.Random
 
     case class PlayerWantsToAttack(uuid:String)
 
-    case class UpdatePlayersMovement(player:ActorRef)
-
     case class PlayerTalking(msg:String)
 
     case class ChunksRequest(ids:Set[Long])
@@ -219,19 +233,25 @@ import scala.util.Random
     case class SurroundingsRequest(p:Point, dist:Float)
 
     class CharView(
-                      val uuid: String,
-                      var state: Movement.Type,
-                      val actor: ActorRef,
-                      val sprite: String
+                    val uuid: String,
+                    var state: CharState.Type,
+                    val actor: ActorRef,
+                    val sprite: String
                     )
 
-    object Movement {
+    object CharState {
       sealed trait Type {
         def p:Point
       }
 
+      sealed trait Timed {
+        def endTs:Long
+      }
+
       case class Standing(p: Point) extends Type
 
-      case class MovingTo(p: Point, arrivalTs: Long) extends Type
+      case class MovingTo(p: Point, endTs: Long) extends Type with Timed
+
+      case class Attacking(uuid:String, p:Point, endTs: Long) extends Type with Timed
     }
   }

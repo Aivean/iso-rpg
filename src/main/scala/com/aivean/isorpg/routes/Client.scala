@@ -78,6 +78,14 @@ class Client extends WebSocketAction  {
             ("ts" -> ts) merge decompose(p)
         )
 
+      case PlayerAttacked(id, targetId, ts) =>
+        send(
+          ("t" -> "a") ~
+            ("id" -> id) ~
+            ("targetId" -> targetId) ~
+            ("ts" -> ts)
+        )
+
       case PlayerAdded(id, p, sprite) =>
         send(
           ("t" -> "pa") ~
@@ -152,6 +160,8 @@ object Client {
   case class Received(json: JValue)
 
   case class PlayerMoved(uuid: String, ts: Long, p: Point, zShift:Float)
+
+  case class PlayerAttacked(uuid: String, targetUuid:String, ts: Long)
 
   case class PlayerTalking(uuid: String, msg:String)
 

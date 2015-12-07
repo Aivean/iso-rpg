@@ -55,6 +55,184 @@ $(function () {
 		}
 	}
 
+
+	var actions = {
+		// moved
+		'm': function (data) {
+			var p = players[data.id];
+			if (p) {
+				var anim = p.extra.selectMovement(
+					data.x * scale, data.y * scale);
+
+				var zShift = data.zShift * scale;
+
+				var tween = game.add.tween(p).to({
+						isoX: (data.x * scale),
+						isoY: (data.y * scale),
+						isoZ: (data.z * scale - Math.abs(p.width / 2)) +
+						1
+						+ zShift
+
+					}, Phaser.Math.max(
+						data.ts + timeDiff - Date.now(), 50),
+					Phaser.Easing.Linear.None,
+					false);
+
+				tween.onComplete.add(function () {
+					p.extra.movementsStack -= 1;
+					setTimeout(function () {
+						if (p.extra.movementsStack == 0) {
+							p.extra.movements.stop();
+						}
+					}, Math.max(latency * 2, 50));
+				}, this);
+				anim(); // run the animation
+				p.extra.movementsStack += 1;
+				tween.start();
+			}
+		},
+
+		// attack!
+		'a': function (data) {
+			var p = players[data.id];
+			var target = players[data.targetId];
+			if (p && target) {
+				var anim = p.extra.selectMovement(
+					target.isoX, target.isoY);
+
+				var delta = 0.3;
+				var tX = p.isoX + (target.isoX - p.isoX) * delta;
+				var tY = p.isoY + (target.isoY - p.isoY) * delta;
+				var tZ = p.isoZ + (target.isoZ - p.isoZ) * delta;
+
+				if (p == player) {
+					game.camera.unfollow();
+				}
+
+				var tween = game.add.tween(p).to({
+						isoX: tX,
+						isoY: tY,
+						isoZ: tZ
+					}, Phaser.Math.max(
+						data.ts + timeDiff - Date.now(), 50),
+					Phaser.Easing.Linear.None,
+					false, 0, 0, true);
+
+				tween.onComplete.add(function () {
+					if (p == player) {
+						game.camera.follow(player);
+					}
+					p.extra.movementsStack -= 1;
+					setTimeout(function () {
+						if (p.extra.movementsStack == 0) {
+							p.extra.movements.stop();
+						}
+					}, Math.max(latency * 2, 50));
+				}, this);
+				anim(); // run the animation
+				p.extra.movementsStack += 1;
+				tween.start();
+			}
+		},
+		// player added
+		'pa': function (data) {
+			var newP = createPlayer(data.id,
+				data.x * scale,
+				data.y * scale,
+				data.z * scale,
+				data.sprite
+			);
+			if (data.cur) {
+				player = newP;
+				game.camera.focusOn(player);
+				game.camera.follow(player);
+			}
+		},
+
+		// tile added
+		'ta': function (data) {
+			updateQueue.enqueue(function () {
+				data.tiles.forEach(function (tile) {
+					var t = game.add.isoSprite(tile.x * scale,
+						tile.y * scale, tile.z * scale,
+						'tileset', tile.tile, isoGroup);
+					//game.physics.isoArcade.enable(t);
+
+					if (tile.overlay) {
+						t.addChild(game.make.image(0, 0,
+							'tileset', tile.overlay))
+							.anchor.set(0.5, 1.5);
+					}
+
+					t.anchor.set(0.5, 1);
+					t.isoZ -= Math.abs(t.width / 2);
+
+					t.extra =
+						new TileExtra(tile, data.c, t.isoZ);
+				});
+			});
+		},
+		'tr': function (data) {
+			updateQueue.enqueue(function () {
+				data.c.forEach(function (c) {
+					isoGroup.removePredicate(function (tile) {
+						return tile.extra &&
+							tile.extra.chunkN == c;
+					});
+				});
+			});
+		},
+
+		// player removed
+		'pr': function (data) {
+			if (players[data.id]) {
+				var p = players[data.id];
+				delete players[data.id];
+				isoGroup.remove(p);
+				p.destroy();
+			}
+		},
+
+		// player talking
+		'pt': function (data) {
+			if (players[data.id]) {
+				var p = players[data.id];
+				var prefix = p == player ? 'You: ' :
+					'Someone: ';
+
+				addToConsole(
+					$("<p></p>").text(prefix + data.msg));
+
+				var bubble = new SpeechBubble(game, 0, -10 -
+					p.height / 2,
+					20, data.msg);
+				p.addChild(bubble);
+				setTimeout(function () {
+					player.removeChild(bubble);
+					bubble.destroy();
+				}, 5000);
+			}
+		},
+		// server message
+		'sm': function (data) {
+			addToConsole(
+				$("<p></p>").css({'color': 'red'}).text(
+					data.msg));
+		},
+
+		// pong received
+		'pong': function (data) {
+			var curTime = Date.now();
+			var roundTime = curTime - data.ts;
+			latency = latency +
+				((roundTime / 2.0) - latency) * 0.1;
+			var curTimeDiff = curTime - data.serverTs - latency;
+			timeDiff =
+				timeDiff + (curTimeDiff - timeDiff) * 0.2;
+			//console.log(latency, timeDiff);
+		}
+	};
+
 	function connect() {
 
 		try {
@@ -80,146 +258,7 @@ $(function () {
 						//console.log(data);
 					}
 
-					switch (data.t) {
-						// moved
-						case 'm':
-							var p = players[data.id];
-							if (p) {
-								var hor = Math.abs(data.x * scale - p.isoX) >=
-									Math.abs(data.y * scale - p.isoY);
-
-								var anim;
-								if (hor && data.x * scale < p.isoX) {
-									anim = p.extra.movements.west;
-								} else if (hor && data.x * scale > p.isoX) {
-									anim = p.extra.movements.east;
-								} else if (data.y * scale > p.isoY) {
-									anim = p.extra.movements.south;
-								} else /*if (data.y * scale < p.isoY)*/ {
-									anim = p.extra.movements.north;
-								}
-
-								var zShift = data.zShift * scale;
-
-								var tween = game.add.tween(p).to({
-										isoX: (data.x * scale),
-										isoY: (data.y * scale),
-										isoZ: (data.z * scale - Math.abs(p.width / 2)) + 1
-												+ zShift
-
-									}, Phaser.Math.max(
-										data.ts + timeDiff - Date.now(), 50),
-									Phaser.Easing.Linear.None,
-									false);
-
-								tween.onComplete.add(function () {
-									p.extra.movementsStack -= 1;
-									setTimeout(function () {
-										if (p.extra.movementsStack == 0) {
-											p.extra.movements.stop();
-										}
-									}, Math.max(latency * 2, 50));
-								}, this);
-								anim(); // run the animation
-								p.extra.movementsStack += 1;
-								tween.start();
-							}
-							break;
-
-						// player added
-						case 'pa':
-							var newP = createPlayer(data.id,
-								data.x * scale,
-								data.y * scale,
-								data.z * scale,
-								data.sprite
-							);
-							if (data.cur) {
-								player = newP;
-								game.camera.focusOn(player);
-								game.camera.follow(player);
-							}
-							break;
-
-						// tile added
-						case 'ta':
-							updateQueue.enqueue(function () {
-								data.tiles.forEach(function (tile) {
-									var t = game.add.isoSprite(tile.x * scale,
-										tile.y * scale, tile.z * scale,
-										'tileset', tile.tile, isoGroup);
-									//game.physics.isoArcade.enable(t);
-
-									if (tile.overlay) {
-										t.addChild(game.make.image(0, 0,
-											'tileset', tile.overlay))
-											.anchor.set(0.5, 1.5);
-									}
-
-									t.anchor.set(0.5, 1);
-									t.isoZ -= Math.abs(t.width / 2);
-
-									t.extra = new TileExtra(tile, data.c, t.isoZ);
-								});
-							});
-							break;
-						case 'tr':
-							updateQueue.enqueue(function () {
-								data.c.forEach(function (c) {
-									isoGroup.removePredicate(function (tile) {
-										return tile.extra &&
-											tile.extra.chunkN == c;
-									});
-								});
-							});
-							break;
-
-						// player removed
-						case 'pr':
-							if (players[data.id]) {
-								var p = players[data.id];
-								delete players[data.id];
-								isoGroup.remove(p);
-								p.destroy();
-							}
-							break;
-
-						// player talking
-						case 'pt':
-							if (players[data.id]) {
-								var p = players[data.id];
-								var prefix = p == player ? 'You: ' : 'Someone: ';
-
-								addToConsole(
-									$("<p></p>").text(prefix + data.msg));
-
-								var bubble = new SpeechBubble(game, 0, -10 - p.height / 2,
-									20, data.msg);
-								p.addChild(bubble);
-								setTimeout(function() {
-									player.removeChild(bubble);
-									bubble.destroy();
-								}, 5000);
-							}
-							break;
-						// server message
-						case 'sm':
-							addToConsole(
-								$("<p></p>").css({ 'color': 'red'}).text(data.msg));
-							break;
-
-						// pong received
-						case 'pong':
-							var curTime = Date.now();
-							var roundTime = curTime - data.ts;
-							latency = latency +
-								((roundTime / 2.0) - latency) * 0.1;
-							var curTimeDiff = curTime - data.serverTs - latency;
-							timeDiff =
-								timeDiff + (curTimeDiff - timeDiff) * 0.2;
-							//console.log(latency, timeDiff);
-							break;
-					}
+					actions[data.t](data);
 
 				} catch (e) {
 					console.error(e, "message:", msg);
@@ -443,6 +482,24 @@ $(function () {
 			player.extra.movements.north =
 				player.extra.movements.east = scaleAndAnimate(1, 'right');
 		}
+
+		function select(tX, tY) {
+			var hor = Math.abs(tX - player.isoX) >=
+				Math.abs(tY - player.isoY);
+			if (hor && tX < player.isoX) {
+				return "west";
+			} else if (hor && tX > player.isoX) {
+				return "north";
+			} else if (tY > player.isoY) {
+				return "south";
+			} else  {
+				return "east";
+			}
+		}
+
+		player.extra.selectMovement = function (tX, tY) {
+			return player.extra.movements[select(tX, tY)];
+		};
 
 		//common for now
 		player.extra.movements.stop = function () {

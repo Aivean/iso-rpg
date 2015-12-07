@@ -62,6 +62,10 @@ class VisibilityController private extends Actor with ActorLogging {
       index.viewersOf(uuid).filter(v => v.visible.contains(uuid))
         .foreach(v => v.actor ! Player.PlayerMoved(uuid, ts, to, zShift))
 
+    case CharAttacking(uuid, targetUuid, ts) =>
+      index.viewersOf(uuid).filter(v => v.visible.contains(uuid) && v.visible.contains(targetUuid))
+        .foreach(v => v.actor ! Player.PlayerAttacked(uuid, targetUuid, ts))
+
     case CharRemoved(uuid) =>
       index.viewersOf(uuid).filter(_.visible.contains(uuid)).foreach { v =>
         v.visible -= uuid
@@ -170,6 +174,7 @@ object VisibilityController {
   case class NPCAdded(commons:CharCommons)
   case class UpdatePlayersVisible(uuid: String)
   case class CharMoving(uuid: String, ts: Long, to: Point, zShift: Float)
+  case class CharAttacking(uuid: String, targetUuid:String, ts: Long)
   case class CharPositionChanged(uuid:String, to:Point)
   case class CharRemoved(uuid:String)
 
