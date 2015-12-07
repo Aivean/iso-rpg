@@ -1,9 +1,10 @@
 package com.aivean.isorpg.game.chars
 
-import akka.actor.{ActorLogging, Actor, Props}
-import com.aivean.isorpg.game.{World, Point}
+import akka.actor.{Actor, ActorLogging, Props}
 import com.aivean.isorpg.game.Tiles.TileType
+import com.aivean.isorpg.game.{Point, World}
 
+import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
@@ -17,7 +18,13 @@ class Monster private (override val initialPos:Point) extends Actor with ActorLo
   import Monster._
 
   var lastArrivedAt = System.currentTimeMillis()
+  var lastQ = Queue[(Point, Long)](initialPos -> System.currentTimeMillis())
   def longTimeNoMovement = System.currentTimeMillis() - lastArrivedAt > (3 second).toMillis
+
+  def cyclicMovement = {
+    val (lastP, lastTs) = lastQ.last
+    lastQ.tail.collect{case (`lastP`, ts) if lastTs - ts < (3 seconds).toMillis => true}.nonEmpty
+  }
 
   implicit val ec = context.dispatcher
 
@@ -25,7 +32,7 @@ class Monster private (override val initialPos:Point) extends Actor with ActorLo
 
   def receive = movingObjectBehavior.orElse({
     case UpdateMovement =>
-      if (movingTarget.isEmpty || longTimeNoMovement) {
+      if (movingTarget.isEmpty || longTimeNoMovement || cyclicMovement) {
         context.parent ! World.SurroundingsRequest(pos, 5)
       }
       context.system.scheduler.scheduleOnce(
@@ -41,6 +48,8 @@ class Monster private (override val initialPos:Point) extends Actor with ActorLo
 
   override def onArrivedAt(): Unit = {
     lastArrivedAt = System.currentTimeMillis()
+    lastQ = lastQ.enqueue(pos -> lastArrivedAt)
+    while (lastQ.size > 4) {lastQ = lastQ.tail}
   }
 }
 
