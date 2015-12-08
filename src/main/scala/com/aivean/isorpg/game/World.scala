@@ -30,9 +30,11 @@ import scala.util.Random
     var chunks = world.groupBy(_._1.chunk)
 
     var occupied = Set[Point]()
-    var players = Seq[CharView]()
-    var npcs = Seq[CharView]()
-    def allChars = players.view ++ npcs
+    var players = Map[ActorRef, CharView]()
+    var npcs = Map[ActorRef, CharView]()
+    var indexByUuid = Map[String, CharView]()
+    def allChars = (players.view ++ npcs).map(_._2)
+    def findChar(actor:ActorRef) = players.get(actor).orElse(npcs.get(actor))
 
     for(i <- 1 to 100) {
         val fp = genFreePoint
@@ -40,7 +42,8 @@ import scala.util.Random
         val uuid = Utils.uuid
         val a = context.actorOf(Monster.props(fp), "poring-" + uuid)
         val view = new CharView(uuid, CharState.Standing(fp), a, "poring")
-        npcs :+= view
+        npcs += (a -> view)
+        indexByUuid += (uuid -> view)
         visContr ! VisibilityController.NPCAdded(CharCommons(view.uuid, view.state.p, view.sprite))
       }
 
@@ -52,7 +55,7 @@ import scala.util.Random
     def zShift(p:Point) = world.get(p.down).map(_.height - 1f).getOrElse(0f)
 
     def genFreePoint = {
-      val p = Random.shuffle(players.map(_.state.p)).headOption.getOrElse(Random.shuffle(world.keys.toSeq).head)
+      val p = Random.shuffle(players.map(_._2.state.p)).headOption.getOrElse(Random.shuffle(world.keys.toSeq).head)
 
       Random.shuffle(world.keys.toSeq.filter(_.distTo(p) <= 10).map(_.up).filter(freeToMoveTo)).head
     }
@@ -62,11 +65,12 @@ import scala.util.Random
         val client = sender
         val char = {
           val pos = genFreePoint
-          val newPlayerActor = context.actorOf(Player.props(pos, client), "player-" + uuid)
-          new CharView(uuid, CharState.Standing(pos), newPlayerActor, "player")
+          val actorRef = context.actorOf(Player.props(pos, client), "player-" + uuid)
+          new CharView(uuid, CharState.Standing(pos), actorRef, "player")
         }
         occupied += char.state.p
-        players :+= char
+        players += (char.actor -> char)
+        indexByUuid += (char.uuid -> char)
 
         visContr ! VisibilityController.PlayerAdded(CharCommons(char.uuid, char.state.p, char.sprite),
           char.actor, 25, 21)
@@ -77,9 +81,9 @@ import scala.util.Random
         case "generateWorld" =>
           world = TerrainGen.apply(worldSize)
           chunks = world.groupBy(_._1.chunk)
-          players.foreach(_.actor ! Player.ServerMessage("World Regenerated!"))
+          players.foreach(_._2.actor ! Player.ServerMessage("World Regenerated!"))
         case "location" =>
-          players.find(_.actor == player) foreach { player =>
+          players.get(player) foreach { player =>
             player.actor ! Player.ServerMessage(player.state.p.toString)
           }
         case NEIGHTBOURS_PATTERN(x, y, z) =>
@@ -97,7 +101,7 @@ import scala.util.Random
 
       case PlayerWantsToMove(targetP) =>
         log.debug(s"want to move to $targetP")
-        allChars.find(_.actor == sender).filter(_.state.isInstanceOf[CharState.Standing])
+        findChar(sender).filter(_.state.isInstanceOf[CharState.Standing])
           .foreach { movingPlayer =>
 
             log.debug(s"found player $movingPlayer ${movingPlayer.state}")
@@ -132,9 +136,9 @@ import scala.util.Random
             }
           }
 
-      case PlayerWantsToAttack(uuid) => allChars.find(_.actor == sender)
+      case PlayerWantsToAttack(uuid) => findChar(sender)
         .filter(_.state.isInstanceOf[CharState.Standing]).foreach { player =>
-        allChars.find(_.uuid == uuid) match {
+        indexByUuid.get(uuid) match {
           case Some(target) if target.state.p.closeProximity.contains(player.state.p) =>
             sender ! Player.ServerMessage("Attack!")
             val attackTime = 300 milliseconds
@@ -152,7 +156,7 @@ import scala.util.Random
       }
 
       case msg@UpdateCharState(playerActor) =>
-        allChars.find(_.actor == playerActor).foreach { player =>
+        findChar(playerActor).foreach { player =>
           log.debug("updating moving state")
           val time = System.currentTimeMillis()
           player.state match {
@@ -197,13 +201,14 @@ import scala.util.Random
 
       //TODO delegate broadcast functionality to other dedicated actor
 
-      case PlayerTalking(msg) => players.find(_.actor == sender).foreach { player =>
-        players.foreach(_.actor ! Player.PlayerTalking(player.uuid, msg))
+      case PlayerTalking(msg) => players.get(sender).foreach { player =>
+        players.foreach(_._2.actor ! Player.PlayerTalking(player.uuid, msg))
       }
 
       case ClientDisconnected =>
-        players.find(_.actor == sender).foreach { p =>
-          players = players.filterNot(_ == p)
+        players.get(sender).foreach { p =>
+          players -= p.actor
+          indexByUuid -= p.uuid
           occupied -= p.state.p
           visContr ! VisibilityController.CharRemoved(p.uuid)
         }
