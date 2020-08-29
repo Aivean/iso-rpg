@@ -3,7 +3,7 @@ Isometric RPG
 
 Attempt to create simple old-school isometric multiplayer RPG using modern Scala technologies.
 
-![Screenshot](assets/screenshot.png)
+![Screenshot](assets/screenshot.gif)
 
 Tech stack:
 
